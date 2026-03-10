@@ -137,8 +137,14 @@
           </p>
           <div class="form-grid two-col">
             <div class="form-group">
-              <label>Ticker Speed <span id="ticker-speed-val" style="color:#1a237e;font-weight:700;">40</span> px/s</label>
+              <label>📢 Announcement Scroll Speed &nbsp;<span id="ticker-speed-val" style="color:#1a237e;font-weight:700;">40</span><span style="color:#888;font-weight:400;font-size:.82rem;"> / 120</span></label>
               <input type="range" id="set-ticker-speed" class="form-range" min="10" max="120" value="40" oninput="document.getElementById('ticker-speed-val').textContent=this.value" />
+              <div style="display:flex;justify-content:space-between;font-size:.78rem;color:#888;margin-top:2px;">
+                <span>🐢 Slow (10)</span>
+                <span style="color:#1a237e;font-size:.75rem;">Default: 40</span>
+                <span>🚀 Fast (120)</span>
+              </div>
+              <p style="margin:4px 0 0;font-size:.78rem;color:#666;">Controls how fast the announcement banner scrolls across the bottom of the screen.</p>
             </div>
             <div class="form-group">
               <label>Programs Switch Timer <span id="program-switch-seconds-val" style="color:#1a237e;font-weight:700;">10</span> sec</label>
