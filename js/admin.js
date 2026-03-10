@@ -21,6 +21,8 @@ const WEEKDAY_INDEX = {
 
 let _adminSessionWatchdog = null;
 let _activityListenersBound = false;
+let _cloudUiListenerBound = false;
+let _cloudUiRefreshTimer = null;
 
 function getAuthMeta () {
   try {
@@ -112,7 +114,11 @@ function checkSession () {
   return true;
 }
 
-function doLogin () {
+async function doLogin () {
+  if (window.CloudSync && typeof window.CloudSync.bootstrap === 'function') {
+    await window.CloudSync.bootstrap();
+  }
+
   const pwInput = document.getElementById('login-password');
   const errorEl = document.getElementById('login-error');
   const pw      = pwInput.value;
@@ -184,10 +190,30 @@ function showTab (name, navEl) {
 
 /* ── Init ────────────────────────────────────────── */
 function initAdmin () {
+  bindCloudUiRefresh();
   loadDashboard();
   updateAdminClock();
   startAdminSessionWatchdog();
   setInterval(updateAdminClock, 1000);
+}
+
+function bindCloudUiRefresh () {
+  if (_cloudUiListenerBound) return;
+  _cloudUiListenerBound = true;
+
+  window.addEventListener('gmct-data-updated', () => {
+    if (_cloudUiRefreshTimer) clearTimeout(_cloudUiRefreshTimer);
+    _cloudUiRefreshTimer = setTimeout(() => {
+      loadDashboard();
+
+      const active = document.querySelector('.tab-content.active');
+      if (!active) return;
+      if (active.id === 'tab-programs') loadProgramsTable();
+      else if (active.id === 'tab-events') loadEventsTable();
+      else if (active.id === 'tab-announcements') loadAnnouncementsTable();
+      else if (active.id === 'tab-settings') loadSettingsForm();
+    }, 120);
+  });
 }
 
 function updateAdminClock () {
@@ -945,7 +971,11 @@ function toast (msg, type = 'success') {
 }
 
 /* ── On page load ────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  if (window.CloudSync && typeof window.CloudSync.bootstrap === 'function') {
+    await window.CloudSync.bootstrap();
+  }
+
   if (checkSession()) {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('admin-panel').classList.remove('hidden');

@@ -433,11 +433,19 @@ function bindReliabilityHandlers () {
     }
   });
 
+  window.addEventListener('gmct-data-updated', () => {
+    queueDisplayRefresh();
+  });
+
   window.addEventListener('error', triggerErrorRecovery);
   window.addEventListener('unhandledrejection', triggerErrorRecovery);
 }
 
-function init () {
+async function init () {
+  if (window.CloudSync && typeof window.CloudSync.bootstrap === 'function') {
+    await window.CloudSync.bootstrap();
+  }
+
   refreshDisplay();
   updateClock();
   setInterval(updateClock, 1000);

@@ -15,10 +15,11 @@ A local HTML/CSS/JavaScript church announcement display application for **GMCT �
 - **Daily TV reload** — automatically reloads the display at a set time (default 4 AM)
 - **Backup & Restore** — export/import all data as a JSON file
 - **Security hardening** — admin login lockout after 5 failed attempts, inactivity session timeout
+- **Optional Firebase cloud sync** — share programs/events/announcements/settings across devices
 
 ## Project Structure
 
-```
+```text
 ├── index.html        # Public display page (shown on TV/screen)
 ├── admin.html        # Admin panel (add/edit content and settings)
 ├── css/
@@ -40,9 +41,54 @@ A local HTML/CSS/JavaScript church announcement display application for **GMCT �
 ## Deployment
 
 This is a fully static app — no build step needed. You can:
+
 - Host it on **GitHub Pages** (free) by pushing this repo and enabling Pages on the `main` branch.
 - Drop it on any static file host (Netlify, Vercel, etc.).
 - Open the HTML files directly from a local folder.
+
+## Firebase Cloud Sync
+
+Firebase has a free tier called **Spark** (good for small projects and testing).
+
+### 1) Create Firebase project
+
+1. Go to Firebase Console and create a new project.
+2. Add a **Web App**.
+3. Copy the web config values.
+
+### 2) Enable Firestore and Anonymous Auth
+
+1. In Firebase Console, create a **Cloud Firestore** database.
+2. In Authentication, enable **Anonymous** sign-in provider.
+
+### 3) Configure this app
+
+Edit `js/firebase-config.js`:
+
+- Set `window.GMCT_FIREBASE_ENABLED = true`
+- Paste your Firebase config in `window.GMCT_FIREBASE_CONFIG`
+- Set `window.GMCT_FIREBASE_ROOM` to a shared room name (for example: `gmct-main`)
+
+All devices must use the same room name to share one data set.
+
+### 4) Firestore security rules (starter)
+
+Use strict rules in production. A simple starter (requires anonymous sign-in):
+
+```text
+rules_version = '2';
+service cloud.firestore {
+    match /databases/{database}/documents {
+        match /gmctRooms/{roomId} {
+            allow read, write: if request.auth != null;
+        }
+    }
+}
+```
+
+### 5) Publish
+
+Push to GitHub and host on GitHub Pages. Once enabled, changes made from `admin.html` sync to all devices opening the same hosted link.
 
 ## License
 

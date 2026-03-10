@@ -25,10 +25,22 @@ const DEFAULT_SETTINGS = {
   socialTransition: 'fade'
 };
 
+const CLOUD_SYNC_KEYS = [
+  KEYS.PROGRAMS,
+  KEYS.EVENTS,
+  KEYS.ANNOUNCEMENTS,
+  KEYS.SETTINGS
+];
+
 /* ── Storage helpers ─────────────────────────────── */
 const DB = {
   _get (key)       { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
-  _set (key, val)  { localStorage.setItem(key, JSON.stringify(val)); },
+  _set (key, val)  {
+    localStorage.setItem(key, JSON.stringify(val));
+    if (window.CloudSync && typeof window.CloudSync.queuePush === 'function') {
+      window.CloudSync.queuePush(key);
+    }
+  },
 
   getPrograms ()      { return this._get(KEYS.PROGRAMS)      || []; },
   getEvents ()        { return this._get(KEYS.EVENTS)        || []; },
@@ -40,6 +52,183 @@ const DB = {
   saveAnnouncements (d) { this._set(KEYS.ANNOUNCEMENTS, d); },
   saveSettings (d)      { this._set(KEYS.SETTINGS, d);      }
 };
+
+/* ── Optional Firebase cloud sync ────────────────── */
+const CloudSync = {
+  _initPromise: null,
+  _bootPromise: null,
+  _ready: false,
+  _suppressPush: false,
+  _pushTimer: null,
+  _unsubscribe: null,
+  _docRef: null,
+  _lastAppliedVersion: 0,
+
+  isEnabled () {
+    return window.GMCT_FIREBASE_ENABLED === true;
+  },
+
+  isConfigured () {
+    const cfg = window.GMCT_FIREBASE_CONFIG || {};
+    return !!(
+      this.isEnabled() &&
+      cfg.apiKey &&
+      cfg.authDomain &&
+      cfg.projectId &&
+      cfg.appId &&
+      typeof window.GMCT_FIREBASE_ROOM === 'string' &&
+      window.GMCT_FIREBASE_ROOM.trim()
+    );
+  },
+
+  async init () {
+    if (this._ready) return true;
+    if (this._initPromise) return this._initPromise;
+
+    this._initPromise = (async () => {
+      if (!this.isConfigured()) return false;
+      if (!window.firebase || !firebase.initializeApp || !firebase.firestore) return false;
+
+      try {
+        const cfg = window.GMCT_FIREBASE_CONFIG;
+        const room = window.GMCT_FIREBASE_ROOM.trim();
+        const appName = 'gmct-announcement-sync';
+
+        const app = firebase.apps.find(a => a.name === appName) || firebase.initializeApp(cfg, appName);
+
+        if (window.GMCT_FIREBASE_USE_ANON_AUTH !== false && firebase.auth) {
+          try {
+            await firebase.auth(app).signInAnonymously();
+          } catch {
+            // Continue without auth when rules allow public access.
+          }
+        }
+
+        this._docRef = firebase.firestore(app).collection('gmctRooms').doc(room);
+        this._ready = true;
+        return true;
+      } catch {
+        this._ready = false;
+        return false;
+      }
+    })();
+
+    return this._initPromise;
+  },
+
+  _applyPayloadToLocal (payload) {
+    if (!payload || typeof payload !== 'object') return;
+
+    const hasPrograms = Array.isArray(payload.programs);
+    const hasEvents = Array.isArray(payload.events);
+    const hasAnnouncements = Array.isArray(payload.announcements);
+    const hasSettings = payload.settings && typeof payload.settings === 'object';
+    if (!hasPrograms && !hasEvents && !hasAnnouncements && !hasSettings) return;
+
+    this._suppressPush = true;
+    try {
+      if (hasPrograms) localStorage.setItem(KEYS.PROGRAMS, JSON.stringify(payload.programs));
+      if (hasEvents) localStorage.setItem(KEYS.EVENTS, JSON.stringify(payload.events));
+      if (hasAnnouncements) localStorage.setItem(KEYS.ANNOUNCEMENTS, JSON.stringify(payload.announcements));
+      if (hasSettings) {
+        const merged = Object.assign({}, DEFAULT_SETTINGS, payload.settings);
+        localStorage.setItem(KEYS.SETTINGS, JSON.stringify(merged));
+      }
+    } finally {
+      this._suppressPush = false;
+    }
+
+    window.dispatchEvent(new CustomEvent('gmct-data-updated', {
+      detail: { source: 'firebase' }
+    }));
+  },
+
+  async pullOnce () {
+    const ok = await this.init();
+    if (!ok || !this._docRef) return false;
+
+    try {
+      const snap = await this._docRef.get();
+      if (!snap.exists) return false;
+
+      const payload = snap.data() || {};
+      const ver = Number(payload.updatedAtMs || 0);
+      if (Number.isFinite(ver) && ver > 0) this._lastAppliedVersion = ver;
+      this._applyPayloadToLocal(payload);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  startRealtimeListener () {
+    if (!this._ready || !this._docRef || this._unsubscribe) return;
+
+    this._unsubscribe = this._docRef.onSnapshot(snap => {
+      if (!snap.exists) return;
+
+      const payload = snap.data() || {};
+      const ver = Number(payload.updatedAtMs || 0);
+      if (Number.isFinite(ver) && ver > 0 && ver <= this._lastAppliedVersion) return;
+
+      if (Number.isFinite(ver) && ver > 0) this._lastAppliedVersion = ver;
+      this._applyPayloadToLocal(payload);
+    }, () => {
+      // Ignore listener errors and continue in local-only mode.
+    });
+  },
+
+  async pushNow () {
+    if (this._suppressPush) return false;
+    const ok = await this.init();
+    if (!ok || !this._docRef) return false;
+
+    const payload = {
+      schemaVersion: 1,
+      updatedAtMs: Date.now(),
+      programs: DB.getPrograms(),
+      events: DB.getEvents(),
+      announcements: DB.getAnnouncements(),
+      settings: DB.getSettings()
+    };
+
+    this._lastAppliedVersion = payload.updatedAtMs;
+
+    try {
+      await this._docRef.set(payload, { merge: true });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  queuePush (changedKey) {
+    if (this._suppressPush) return;
+    if (!this.isEnabled()) return;
+    if (!CLOUD_SYNC_KEYS.includes(changedKey)) return;
+
+    if (this._pushTimer) clearTimeout(this._pushTimer);
+    this._pushTimer = setTimeout(() => {
+      this.pushNow();
+    }, 300);
+  },
+
+  async bootstrap () {
+    if (this._bootPromise) return this._bootPromise;
+
+    this._bootPromise = (async () => {
+      const ok = await this.init();
+      if (!ok) return false;
+      await this.pullOnce();
+      this.startRealtimeListener();
+      return true;
+    })();
+
+    return this._bootPromise;
+  }
+};
+
+window.CloudSync = CloudSync;
 
 /* ── Utilities ───────────────────────────────────── */
 function genId () {
