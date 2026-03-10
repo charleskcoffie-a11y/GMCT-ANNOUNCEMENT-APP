@@ -38,13 +38,22 @@ A local HTML/CSS/JavaScript church announcement display application for **GMCT �
 
 > All data is stored in the browser's `localStorage`. No server or internet connection required.
 
+## Live Site (GitHub Pages)
+
+| Page | URL |
+|------|-----|
+| 📺 Display | https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/ |
+| ⚙️ Admin Panel | https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html |
+
 ## Deployment
 
 This is a fully static app — no build step needed. You can:
 
-- Host it on **GitHub Pages** (free) by pushing this repo and enabling Pages on the `main` branch.
+- Host it on **GitHub Pages** (free) by pushing this repo and enabling Pages on the `master` branch in **Settings → Pages**.
 - Drop it on any static file host (Netlify, Vercel, etc.).
 - Open the HTML files directly from a local folder.
+
+> **Note:** A `.nojekyll` file is included so GitHub Pages serves files as-is without Jekyll processing.
 
 ## Firebase Cloud Sync
 
