@@ -226,6 +226,51 @@ function updateAdminClock () {
   }
 }
 
+function sortEventsByDate (events) {
+  return [...events].sort((a, b) => {
+    const aDate = a.startDate || '';
+    const bDate = b.startDate || '';
+    if (aDate !== bDate) return aDate.localeCompare(bDate);
+
+    const aTime = a.time || '';
+    const bTime = b.time || '';
+    if (aTime !== bTime) return aTime.localeCompare(bTime);
+
+    if (a.featured && !b.featured) return -1;
+    if (!a.featured && b.featured) return 1;
+    return (a.title || '').localeCompare(b.title || '');
+  });
+}
+
+function getProgramNextDateForSort (program, fromDate = getStartOfToday()) {
+  const from = new Date(fromDate);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(from);
+  to.setDate(to.getDate() + 370);
+
+  const occurrences = generateProgramOccurrences(program, from, to, 1);
+  return occurrences[0] || null;
+}
+
+function sortProgramsByNextDate (programs, fromDate = getStartOfToday()) {
+  const base = new Date(fromDate);
+  base.setHours(0, 0, 0, 0);
+
+  return programs
+    .map(program => ({ ...program, nextDate: getProgramNextDateForSort(program, base) }))
+    .sort((a, b) => {
+      const aDate = a.nextDate || '9999-12-31';
+      const bDate = b.nextDate || '9999-12-31';
+      if (aDate !== bDate) return aDate.localeCompare(bDate);
+
+      const aTime = a.startTime || '';
+      const bTime = b.startTime || '';
+      if (aTime !== bTime) return aTime.localeCompare(bTime);
+
+      return (a.title || '').localeCompare(b.title || '');
+    });
+}
+
 /* ════════════════════════════════════════════════════
    DASHBOARD
    ════════════════════════════════════════════════════ */
@@ -235,7 +280,10 @@ function loadDashboard () {
   const announcements = DB.getAnnouncements();
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const upcoming = events.filter(e => new Date((e.endDate || e.startDate) + 'T23:59:59') >= today);
+  const sortedPrograms = sortProgramsByNextDate(programs, today).filter(p => p.nextDate);
+  const upcoming = sortEventsByDate(
+    events.filter(e => new Date((e.endDate || e.startDate) + 'T23:59:59') >= today)
+  );
 
   document.getElementById('stat-programs').textContent      = programs.length;
   document.getElementById('stat-events').textContent        = events.length;
@@ -244,13 +292,13 @@ function loadDashboard () {
 
   // Recent programs list
   const pl = document.getElementById('dash-programs-list');
-  pl.innerHTML = programs.length
-    ? programs.slice(0, 5).map(p => `
+  pl.innerHTML = sortedPrograms.length
+    ? sortedPrograms.slice(0, 5).map(p => `
         <div class="dash-row">
           <span class="dr-title">${esc(p.title)}</span>
-          <span class="dr-meta">${getRecurrenceLabel(p)}</span>
+          <span class="dr-meta">${esc(fmtDate(p.nextDate))} &middot; ${getRecurrenceLabel(p)}</span>
         </div>`).join('')
-    : '<p class="dash-empty">No programs added yet</p>';
+    : '<p class="dash-empty">No upcoming programs</p>';
 
   // Upcoming social activities list
   const el = document.getElementById('dash-events-list');
@@ -428,7 +476,7 @@ function findProgramConflicts (candidate, existingPrograms) {
 }
 
 function loadProgramsTable () {
-  const list  = DB.getPrograms();
+  const list  = sortProgramsByNextDate(DB.getPrograms());
   const tbody = document.getElementById('programs-tbody');
 
   if (!list.length) {
@@ -571,7 +619,7 @@ function deleteProgram (id) {
 let _editEvtId = null;
 
 function loadEventsTable () {
-  const list  = DB.getEvents();
+  const list  = sortEventsByDate(DB.getEvents());
   const tbody = document.getElementById('events-tbody');
 
   if (!list.length) {

@@ -204,9 +204,11 @@ function getUpcomingSocialActivities () {
       return end >= today;
     })
     .sort((a, b) => {
+      if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+      if ((a.time || '') !== (b.time || '')) return (a.time || '').localeCompare(b.time || '');
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
-      return a.startDate.localeCompare(b.startDate);
+      return (a.title || '').localeCompare(b.title || '');
     });
 }
 
