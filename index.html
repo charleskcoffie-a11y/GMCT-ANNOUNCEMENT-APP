@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GMCT-Ghana Methodist Church of Toronto – Display</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="display-body">
+
+  <!-- ── HEADER ─────────────────────────────────── -->
+  <header class="display-header">
+    <div class="hd-left">
+      <span class="cross-icon">✝</span>
+    </div>
+    <div class="hd-center">
+      <h1 class="church-name" id="disp-church-name">GMCT-Ghana Methodist Church of Toronto</h1>
+      <p class="church-tagline" id="disp-church-tagline">Upcoming Programs and Social Activities</p>
+    </div>
+    <div class="hd-right">
+      <div class="live-time" id="live-time">12:00:00 PM</div>
+      <div class="live-date" id="live-date">Sunday, January 1, 2026</div>
+    </div>
+  </header>
+
+  <!-- ── MAIN ───────────────────────────────────── -->
+  <main class="display-main">
+
+    <!-- Upcoming Programs -->
+    <section class="display-panel">
+      <div class="panel-header">
+        <span>📅</span>
+        <h2>Upcoming Programs</h2>
+      </div>
+      <div class="panel-body" id="programs-list">
+        <div class="no-content">No upcoming programs yet</div>
+      </div>
+    </section>
+
+    <!-- Social Activities -->
+    <section class="display-panel">
+      <div class="panel-header">
+        <span>🎉</span>
+        <h2>Social Activities</h2>
+      </div>
+      <div class="panel-body" id="social-list">
+        <div class="no-content">No upcoming social activities</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── TICKER ─────────────────────────────────── -->
+  <footer class="display-footer">
+    <div class="ticker-badge">📢 ANNOUNCEMENTS</div>
+    <div class="ticker-track">
+      <div class="ticker-text" id="ticker-text">Welcome to GMCT Church &nbsp;•&nbsp; May God bless you &nbsp;•&nbsp;</div>
+    </div>
+    <a href="admin.html" class="admin-link" title="Admin Panel">⚙</a>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

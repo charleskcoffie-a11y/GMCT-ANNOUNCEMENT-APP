@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GMCT – Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="admin-body">
+
+  <!-- ══════════════════════════════════════════════
+       LOGIN SCREEN
+  ══════════════════════════════════════════════ -->
+  <div id="login-screen" class="login-overlay">
+    <div class="login-card">
+      <div class="login-logo">✝</div>
+      <h2 class="login-title">Admin Login</h2>
+      <p class="login-sub">GMCT Display Management</p>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" class="form-input" placeholder="Enter admin password" />
+      </div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">Login</button>
+      <p id="login-error" class="error-msg hidden">Incorrect password. Please try again.</p>
+      <a href="index.html" class="back-link">← Back to Display</a>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       ADMIN PANEL
+  ══════════════════════════════════════════════ -->
+  <div id="admin-panel" class="admin-wrapper hidden">
+
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-logo">
+        <span class="cross-icon">✝</span>
+        <span>GMCT Admin</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" onclick="showTab('dashboard',this)"><span class="ni">📊</span><span class="nl">Dashboard</span></a>
+        <a href="#" class="nav-item" onclick="showTab('programs',this)"><span class="ni">📅</span><span class="nl">Programs</span></a>
+        <a href="#" class="nav-item" onclick="showTab('events',this)"><span class="ni">🎉</span><span class="nl">Social Activities</span></a>
+        <a href="#" class="nav-item" onclick="showTab('announcements',this)"><span class="ni">📢</span><span class="nl">Announcements</span></a>
+        <a href="#" class="nav-item" onclick="showTab('settings',this)"><span class="ni">⚙️</span><span class="nl">Settings</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="index.html" class="nav-item"><span class="ni">🖥️</span><span class="nl">View Display</span></a>
+        <a href="#" class="nav-item logout-btn" onclick="doLogout()"><span class="ni">🚪</span><span class="nl">Logout</span></a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <h2 id="page-heading">Dashboard</h2>
+        <span id="admin-datetime" class="admin-time"></span>
+      </div>
+
+      <!-- ── DASHBOARD TAB ─────────────────────── -->
+      <div id="tab-dashboard" class="tab-content active">
+        <div class="stats-grid">
+          <div class="stat-card blue"><div class="stat-icon">📅</div><div><div class="stat-num" id="stat-programs">0</div><div class="stat-lbl">Programs</div></div></div>
+          <div class="stat-card gold"><div class="stat-icon">🎉</div><div><div class="stat-num" id="stat-events">0</div><div class="stat-lbl">Social Activities</div></div></div>
+          <div class="stat-card green"><div class="stat-icon">📢</div><div><div class="stat-num" id="stat-announcements">0</div><div class="stat-lbl">Active Announcements</div></div></div>
+          <div class="stat-card purple"><div class="stat-icon">📋</div><div><div class="stat-num" id="stat-upcoming">0</div><div class="stat-lbl">Upcoming Activities</div></div></div>
+        </div>
+        <div class="dash-grid">
+          <div class="dash-card"><h3>Programs</h3><div id="dash-programs-list" class="dash-list"></div></div>
+          <div class="dash-card"><h3>Upcoming Social Activities</h3><div id="dash-events-list" class="dash-list"></div></div>
+        </div>
+      </div>
+
+      <!-- ── PROGRAMS TAB ──────────────────────── -->
+      <div id="tab-programs" class="tab-content hidden">
+        <div class="section-toolbar">
+          <h3>Manage Programs</h3>
+          <button class="btn btn-primary" onclick="openProgramModal()">+ Add Program</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Program Title</th><th>Day / Date</th><th>Time</th>
+              <th>Venue</th><th>Category</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="programs-tbody">
+              <tr><td colspan="6" class="empty-row">No programs added yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── SOCIAL ACTIVITIES TAB ─────────────── -->
+      <div id="tab-events" class="tab-content hidden">
+        <div class="section-toolbar">
+          <h3>Manage Social Activities</h3>
+          <button class="btn btn-primary" onclick="openEventModal()">+ Add Social Activity</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Activity Title</th><th>Start Date</th><th>End Date</th>
+              <th>Time</th><th>Venue</th><th>Featured</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="events-tbody">
+              <tr><td colspan="7" class="empty-row">No social activities added yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── ANNOUNCEMENTS TAB ─────────────────── -->
+      <div id="tab-announcements" class="tab-content hidden">
+        <div class="section-toolbar">
+          <h3>Manage Announcements</h3>
+          <button class="btn btn-primary" onclick="openAnnouncementModal()">+ Add Announcement</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Announcement Text</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="announcements-tbody">
+              <tr><td colspan="3" class="empty-row">No announcements added yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── SETTINGS TAB ──────────────────────── -->
+      <div id="tab-settings" class="tab-content hidden">
+        <div class="settings-form">
+          <h3>Church Display Settings</h3>
+          <p style="margin:0 0 16px;color:#555;font-size:.88rem;line-height:1.5;">
+            Display header is fixed to:
+            <strong>GMCT-Ghana Methodist Church of Toronto</strong>
+          </p>
+          <div class="form-grid two-col">
+            <div class="form-group">
+              <label>Ticker Speed <span id="ticker-speed-val" style="color:#1a237e;font-weight:700;">40</span> px/s</label>
+              <input type="range" id="set-ticker-speed" class="form-range" min="10" max="120" value="40" oninput="document.getElementById('ticker-speed-val').textContent=this.value" />
+            </div>
+            <div class="form-group">
+              <label>Programs Switch Timer <span id="program-switch-seconds-val" style="color:#1a237e;font-weight:700;">10</span> sec</label>
+              <input type="range" id="set-program-switch-seconds" class="form-range" min="5" max="60" value="10" oninput="document.getElementById('program-switch-seconds-val').textContent=this.value" />
+            </div>
+            <div class="form-group">
+              <label>Social Switch Timer <span id="social-switch-seconds-val" style="color:#1a237e;font-weight:700;">10</span> sec</label>
+              <input type="range" id="set-social-switch-seconds" class="form-range" min="5" max="60" value="10" oninput="document.getElementById('social-switch-seconds-val').textContent=this.value" />
+            </div>
+            <div class="form-group full-width">
+              <label style="margin-bottom:4px;display:block;">Programs Panel &mdash; Card Transition Style</label>
+              <div class="tx-picker" id="prog-tx-picker">
+                <button type="button" class="tx-opt" data-val="fade"   onclick="pickTransition('prog-tx-picker','set-program-transition',this)">&#10022; Fade</button>
+                <button type="button" class="tx-opt" data-val="fly"    onclick="pickTransition('prog-tx-picker','set-program-transition',this)">&rarr; Fly In</button>
+                <button type="button" class="tx-opt" data-val="zoom"   onclick="pickTransition('prog-tx-picker','set-program-transition',this)">&#8853; Zoom</button>
+                <button type="button" class="tx-opt" data-val="flip"   onclick="pickTransition('prog-tx-picker','set-program-transition',this)">&#10227; Flip 3D</button>
+                <button type="button" class="tx-opt" data-val="wipe"   onclick="pickTransition('prog-tx-picker','set-program-transition',this)">&uarr; Wipe</button>
+                <button type="button" class="tx-opt" data-val="morph"  onclick="pickTransition('prog-tx-picker','set-program-transition',this)">&#9689; Morph</button>
+                <button type="button" class="tx-opt" data-val="glitch" onclick="pickTransition('prog-tx-picker','set-program-transition',this)">&#9889; Glitch</button>
+              </div>
+              <input type="hidden" id="set-program-transition" value="fade" />
+            </div>
+            <div class="form-group full-width">
+              <label style="margin-bottom:4px;display:block;">Social Panel &mdash; Card Transition Style</label>
+              <div class="tx-picker" id="social-tx-picker">
+                <button type="button" class="tx-opt" data-val="fade"   onclick="pickTransition('social-tx-picker','set-social-transition',this)">&#10022; Fade</button>
+                <button type="button" class="tx-opt" data-val="fly"    onclick="pickTransition('social-tx-picker','set-social-transition',this)">&rarr; Fly In</button>
+                <button type="button" class="tx-opt" data-val="zoom"   onclick="pickTransition('social-tx-picker','set-social-transition',this)">&#8853; Zoom</button>
+                <button type="button" class="tx-opt" data-val="flip"   onclick="pickTransition('social-tx-picker','set-social-transition',this)">&#10227; Flip 3D</button>
+                <button type="button" class="tx-opt" data-val="wipe"   onclick="pickTransition('social-tx-picker','set-social-transition',this)">&uarr; Wipe</button>
+                <button type="button" class="tx-opt" data-val="morph"  onclick="pickTransition('social-tx-picker','set-social-transition',this)">&#9689; Morph</button>
+                <button type="button" class="tx-opt" data-val="glitch" onclick="pickTransition('social-tx-picker','set-social-transition',this)">&#9889; Glitch</button>
+              </div>
+              <input type="hidden" id="set-social-transition" value="fade" />
+            </div>
+            <div class="form-group">
+              <label>Daily TV Reload Time</label>
+              <input type="time" id="set-daily-reload-time" class="form-input" value="04:00" />
+            </div>
+            <div class="form-group">
+              <label>Admin Session Timeout <span id="admin-session-timeout-val" style="color:#1a237e;font-weight:700;">30</span> min</label>
+              <input type="range" id="set-admin-session-timeout" class="form-range" min="5" max="120" value="30" oninput="document.getElementById('admin-session-timeout-val').textContent=this.value" />
+            </div>
+            <div class="form-group full-width" style="margin-top:4px;">
+              <label class="checkbox-label">
+                <input type="checkbox" id="set-auto-reload-on-error" checked />
+                <span>Auto-reload display if a runtime error happens</span>
+              </label>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:4px;">Save Settings</button>
+          <p style="margin:10px 0 0;color:#666;font-size:.82rem;line-height:1.5;">
+            Security hardening enabled: login lockout after repeated failures and automatic logout after inactivity.
+          </p>
+
+          <h3 style="margin-top:28px;">Backup and Restore</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <button class="btn btn-outline" type="button" onclick="exportBackup()">Export Backup (JSON)</button>
+            </div>
+            <div class="form-group">
+              <label>Import Backup (JSON)</label>
+              <input type="file" id="backup-file" class="form-input" accept="application/json,.json" onchange="importBackup(this.files)" />
+              <p style="margin-top:6px;color:#666;font-size:.78rem;line-height:1.45;">Import replaces current programs, social activities, announcements, and settings.</p>
+            </div>
+          </div>
+
+          <h3 style="margin-top:32px;">Change Admin Password</h3>
+          <div class="form-grid two-col">
+            <div class="form-group">
+              <label>Current Password</label>
+              <input type="password" id="set-current-pass" class="form-input" placeholder="Current password" />
+            </div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" id="set-new-pass" class="form-input" placeholder="New password (min 6 chars)" />
+            </div>
+            <div class="form-group">
+              <label>Confirm New Password</label>
+              <input type="password" id="set-confirm-pass" class="form-input" placeholder="Confirm new password" />
+            </div>
+          </div>
+          <button class="btn btn-outline" onclick="changePassword()">Change Password</button>
+          <p id="settings-msg" class="info-msg hidden"></p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       PROGRAM MODAL
+  ══════════════════════════════════════════════ -->
+  <div id="program-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="program-modal-title">Add Program</h3>
+        <button class="modal-close" onclick="closeProgramModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="prog-id" />
+        <div class="form-grid two-col">
+          <div class="form-group full-width">
+            <label>Program Title *</label>
+            <input type="text" id="prog-title" class="form-input" placeholder="e.g. Sunday Morning Service" />
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="prog-category" class="form-input">
+              <option value="service">Service</option>
+              <option value="meeting">Meeting</option>
+              <option value="fellowship">Fellowship</option>
+              <option value="prayer">Prayer</option>
+              <option value="youth">Youth</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="prog-type" class="form-input" onchange="toggleProgDateFields()">
+              <option value="weekly">Weekly (every week)</option>
+              <option value="biweekly">Biweekly (every 2 weeks)</option>
+              <option value="monthly">Monthly (same date each month)</option>
+              <option value="onetime">One-Time</option>
+            </select>
+          </div>
+          <div class="form-group" id="prog-day-group">
+            <label>Day of Week *</label>
+            <select id="prog-day" class="form-input">
+              <option>Sunday</option><option>Monday</option><option>Tuesday</option>
+              <option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="prog-ref-date-group">
+            <label>Reference Date * <small style="font-weight:400;color:#888;">(one known occurrence – biweekly cycles from this)</small></label>
+            <input type="date" id="prog-ref-date" class="form-input" />
+          </div>
+          <div class="form-group hidden" id="prog-dom-group">
+            <label>Day of Month *</label>
+            <select id="prog-dom" class="form-input">
+              <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option>
+              <option value="4">4th</option><option value="5">5th</option><option value="6">6th</option>
+              <option value="7">7th</option><option value="8">8th</option><option value="9">9th</option>
+              <option value="10">10th</option><option value="11">11th</option><option value="12">12th</option>
+              <option value="13">13th</option><option value="14">14th</option><option value="15">15th</option>
+              <option value="16">16th</option><option value="17">17th</option><option value="18">18th</option>
+              <option value="19">19th</option><option value="20">20th</option><option value="21">21st</option>
+              <option value="22">22nd</option><option value="23">23rd</option><option value="24">24th</option>
+              <option value="25">25th</option><option value="26">26th</option><option value="27">27th</option>
+              <option value="28">28th</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="prog-date-group">
+            <label>Specific Date *</label>
+            <input type="date" id="prog-date" class="form-input" />
+          </div>
+          <div class="form-group" id="prog-repeat-until-group">
+            <label>Repeat Until (optional)</label>
+            <input type="date" id="prog-repeat-until" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Start Time *</label>
+            <input type="time" id="prog-start-time" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>End Time</label>
+            <input type="time" id="prog-end-time" class="form-input" />
+          </div>
+          <div class="form-group full-width">
+            <label>Venue *</label>
+            <input type="text" id="prog-venue" class="form-input" placeholder="e.g. Main Auditorium" />
+          </div>
+          <div class="form-group full-width">
+            <label>Description</label>
+            <textarea id="prog-description" class="form-input" rows="3" placeholder="Optional description..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeProgramModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProgram()">Save Program</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SOCIAL ACTIVITY MODAL
+  ══════════════════════════════════════════════ -->
+  <div id="event-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="event-modal-title">Add Social Activity</h3>
+        <button class="modal-close" onclick="closeEventModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="evt-id" />
+        <div class="form-grid two-col">
+          <div class="form-group full-width">
+            <label>Activity Title *</label>
+            <input type="text" id="evt-title" class="form-input" placeholder="e.g. Youth Picnic 2026" />
+          </div>
+          <div class="form-group">
+            <label>Start Date *</label>
+            <input type="date" id="evt-start-date" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>End Date (if multi-day)</label>
+            <input type="date" id="evt-end-date" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Time</label>
+            <input type="time" id="evt-time" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Venue *</label>
+            <input type="text" id="evt-venue" class="form-input" placeholder="e.g. Church Auditorium" />
+          </div>
+          <div class="form-group full-width">
+            <label>Description</label>
+            <textarea id="evt-description" class="form-input" rows="3" placeholder="Brief activity description..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="evt-featured" />
+              <span>Mark as Featured Activity</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeEventModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEvent()">Save Activity</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       ANNOUNCEMENT MODAL
+  ══════════════════════════════════════════════ -->
+  <div id="announcement-modal" class="modal-overlay hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3 id="ann-modal-title">Add Announcement</h3>
+        <button class="modal-close" onclick="closeAnnouncementModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ann-id" />
+        <div class="form-group">
+          <label>Announcement Text *</label>
+          <textarea id="ann-text" class="form-input" rows="4" placeholder="Enter the announcement text..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="ann-active" checked />
+            <span>Active – show in ticker</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAnnouncementModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAnnouncement()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

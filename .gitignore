@@ -1,0 +1,11 @@
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editor folders
+.vscode/
+.idea/
+
+# Backup exports (do not commit exported JSON files)
+gmct-backup-*.json
