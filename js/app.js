@@ -129,6 +129,56 @@ function getNextMonthlyDate (dayOfMonth, startTime) {
   return toIsoDate(candidate);
 }
 
+function getNextMonthlyNthWeekdayDate (dayName, nthOccurrence, startTime) {
+  if (!dayName || !nthOccurrence) return null;
+  const now = new Date();
+  const today = getStartOfDay(now);
+  const dayIdx = WEEKDAY_INDEX[dayName];
+  if (!Number.isFinite(dayIdx)) return null;
+  
+  const nth = parseInt(nthOccurrence, 10);
+  if (!Number.isFinite(nth) || nth < 1 || nth > 5) return null;
+
+  // Start with current month
+  let yr = today.getFullYear();
+  let mo = today.getMonth();
+  let candidate = findNthWeekday(yr, mo, dayIdx, nth);
+  
+  // If that date is already in the past, move to next month
+  if (candidate < today) {
+    mo++;
+    if (mo > 11) { mo = 0; yr++; }
+    candidate = findNthWeekday(yr, mo, dayIdx, nth);
+  }
+  
+  // If it lands today but the time has already passed, move to next month
+  if (toIsoDate(candidate) === toIsoDate(today) && startTime) {
+    const [h, m] = startTime.split(':').map(Number);
+    const startToday = new Date(today);
+    startToday.setHours(h || 0, m || 0, 0, 0);
+    if (startToday < now) {
+      mo++;
+      if (mo > 11) { mo = 0; yr++; }
+      candidate = findNthWeekday(yr, mo, dayIdx, nth);
+    }
+  }
+  
+  return toIsoDate(candidate);
+}
+
+function findNthWeekday (year, month, dayIdx, nth) {
+  let count = 0;
+  for (let d = 1; d <= 31; d++) {
+    const candidate = new Date(year, month, d);
+    if (candidate.getMonth() !== month) break;
+    if (candidate.getDay() === dayIdx) {
+      count++;
+      if (count === nth) return candidate;
+    }
+  }
+  return null;
+}
+
 /* ── Upcoming programs ───────────────────────────── */
 function getUpcomingPrograms () {
   const today = getStartOfDay();
@@ -137,10 +187,11 @@ function getUpcomingPrograms () {
     .map(p => {
       const rType = p.recurrenceType || (p.recurring ? 'weekly' : 'onetime');
       let nextDate;
-      if      (rType === 'weekly')   nextDate = getNextRecurringDate(p.dayOfWeek, p.startTime);
-      else if (rType === 'biweekly') nextDate = getNextBiweeklyDate(p.dayOfWeek, p.refDate, p.startTime);
-      else if (rType === 'monthly')  nextDate = getNextMonthlyDate(p.dayOfMonth, p.startTime);
-      else                           nextDate = p.date;
+      if      (rType === 'weekly')               nextDate = getNextRecurringDate(p.dayOfWeek, p.startTime);
+      else if (rType === 'biweekly')             nextDate = getNextBiweeklyDate(p.dayOfWeek, p.refDate, p.startTime);
+      else if (rType === 'monthly')              nextDate = getNextMonthlyDate(p.dayOfMonth, p.startTime);
+      else if (rType === 'monthly-nth-weekday')  nextDate = getNextMonthlyNthWeekdayDate(p.dayOfWeek, p.nthWeekdayOccurrence, p.startTime);
+      else                                       nextDate = p.date;
       if (!nextDate) return null;
       if (p.repeatUntil && nextDate > p.repeatUntil) return null;
 

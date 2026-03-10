@@ -327,6 +327,12 @@ function getRecurrenceLabel (p) {
       ? `${esc(day)}${ordSuffix(day)} <small>(monthly${esc(until)})</small>`
       : `<small>(monthly${esc(until)})</small>`;
   }
+  if (rType === 'monthly-nth-weekday') {
+    const nth = parseInt(p.nthWeekdayOccurrence, 10);
+    return Number.isFinite(nth)
+      ? `${ordSuffix(nth)} ${esc(p.dayOfWeek || '--')} <small>(monthly${esc(until)})</small>`
+      : `<small>(monthly${esc(until)})</small>`;
+  }
   return esc(fmtDate(p.date));
 }
 
@@ -430,7 +436,36 @@ function generateProgramOccurrences (p, fromDate, toDate, limit = 36) {
     }
   }
 
+  if (type === 'monthly-nth-weekday') {
+    const dayIdx = WEEKDAY_INDEX[p.dayOfWeek];
+    const nth = parseInt(p.nthWeekdayOccurrence, 10);
+    if (dayIdx === undefined || !Number.isFinite(nth) || nth < 1 || nth > 5) return out;
+
+    let yr = fromDate.getFullYear();
+    let mo = fromDate.getMonth();
+    while (out.length < limit) {
+      const candidate = findNthWeekdayInMonth(yr, mo, dayIdx, nth);
+      if (candidate > toDate) break;
+      if (candidate >= fromDate) pushIso(toIsoDateLocal(candidate));
+      mo++;
+      if (mo > 11) { mo = 0; yr++; }
+    }
+  }
+
   return out;
+}
+
+function findNthWeekdayInMonth (year, month, dayIdx, nth) {
+  let count = 0;
+  for (let d = 1; d <= 31; d++) {
+    const candidate = new Date(year, month, d);
+    if (candidate.getMonth() !== month) break;
+    if (candidate.getDay() === dayIdx) {
+      count++;
+      if (count === nth) return candidate;
+    }
+  }
+  return new Date(year, month + 1, 1); // Return the first day of next month if not found
 }
 
 function findProgramConflicts (candidate, existingPrograms) {
@@ -500,13 +535,14 @@ function loadProgramsTable () {
 function openProgramModal () {
   _editProgId = null;
   document.getElementById('program-modal-title').textContent = 'Add Program';
-  ['prog-id','prog-title','prog-date','prog-repeat-until','prog-start-time','prog-end-time','prog-venue','prog-description']
+  ['prog-id','prog-title','prog-date','prog-repeat-until','prog-start-time','prog-end-time','prog-venue','prog-description','prog-announce-lead-days']
     .forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('prog-category').value = 'service';
   document.getElementById('prog-type').value = 'weekly';
   document.getElementById('prog-day').value = 'Sunday';
   document.getElementById('prog-ref-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('prog-dom').value = '1';
+  document.getElementById('prog-nth-occurrence').value = '1';
   toggleProgDateFields();
   document.getElementById('program-modal').classList.remove('hidden');
 }
@@ -524,12 +560,14 @@ function editProgram (id) {
   document.getElementById('prog-day').value         = p.dayOfWeek || 'Sunday';
   document.getElementById('prog-ref-date').value    = p.refDate || new Date().toISOString().split('T')[0];
   document.getElementById('prog-dom').value         = p.dayOfMonth ? String(p.dayOfMonth) : '1';
+  document.getElementById('prog-nth-occurrence').value = p.nthWeekdayOccurrence || '1';
   document.getElementById('prog-date').value        = p.date || '';
   document.getElementById('prog-repeat-until').value = p.repeatUntil || '';
   document.getElementById('prog-start-time').value  = p.startTime || '';
   document.getElementById('prog-end-time').value    = p.endTime || '';
   document.getElementById('prog-venue').value       = p.venue;
   document.getElementById('prog-description').value = p.description || '';
+  document.getElementById('prog-announce-lead-days').value = p.announceLead || '';
   toggleProgDateFields();
   document.getElementById('program-modal').classList.remove('hidden');
 }
@@ -540,10 +578,11 @@ function closeProgramModal () {
 
 function toggleProgDateFields () {
   const type = document.getElementById('prog-type').value;
-  document.getElementById('prog-day-group').classList.toggle('hidden',     type !== 'weekly' && type !== 'biweekly');
-  document.getElementById('prog-ref-date-group').classList.toggle('hidden', type !== 'biweekly');
-  document.getElementById('prog-dom-group').classList.toggle('hidden',      type !== 'monthly');
-  document.getElementById('prog-date-group').classList.toggle('hidden',     type !== 'onetime');
+  document.getElementById('prog-day-group').classList.toggle('hidden',         type !== 'weekly' && type !== 'biweekly' && type !== 'monthly-nth-weekday');
+  document.getElementById('prog-ref-date-group').classList.toggle('hidden',    type !== 'biweekly');
+  document.getElementById('prog-dom-group').classList.toggle('hidden',         type !== 'monthly');
+  document.getElementById('prog-nth-occurrence-group').classList.toggle('hidden', type !== 'monthly-nth-weekday');
+  document.getElementById('prog-date-group').classList.toggle('hidden',        type !== 'onetime');
   document.getElementById('prog-repeat-until-group').classList.toggle('hidden', type === 'onetime');
 }
 
@@ -554,6 +593,7 @@ function saveProgram () {
   const type      = document.getElementById('prog-type').value;
   const date      = document.getElementById('prog-date').value;
   const repeatUntil = document.getElementById('prog-repeat-until').value || null;
+  const announceLead = parseInt(document.getElementById('prog-announce-lead-days').value || '0', 10);
 
   if (!title || !venue || !startTime) {
     toast('Please fill all required fields: Title, Start Time, Venue', 'error'); return;
@@ -563,6 +603,14 @@ function saveProgram () {
   }
   if (type === 'biweekly' && !document.getElementById('prog-ref-date').value) {
     toast('Please set a reference date for the biweekly schedule', 'error'); return;
+  }
+  if (type === 'monthly-nth-weekday') {
+    // Validate that both day and occurrence are selected
+    const day = document.getElementById('prog-day').value;
+    const occ = document.getElementById('prog-nth-occurrence').value;
+    if (!day || !occ) {
+      toast('Please select both day of week and occurrence for monthly nth-weekday', 'error'); return;
+    }
   }
   if (type !== 'onetime' && repeatUntil && repeatUntil < toIsoDateLocal(getStartOfToday())) {
     toast('Repeat-until date cannot be in the past', 'error'); return;
@@ -574,15 +622,17 @@ function saveProgram () {
     category:       document.getElementById('prog-category').value,
     recurrenceType: type,
     recurring:      type !== 'onetime',
-    dayOfWeek:      (type === 'weekly' || type === 'biweekly') ? document.getElementById('prog-day').value : null,
+    dayOfWeek:      (type === 'weekly' || type === 'biweekly' || type === 'monthly-nth-weekday') ? document.getElementById('prog-day').value : null,
     refDate:        type === 'biweekly' ? document.getElementById('prog-ref-date').value : null,
     dayOfMonth:     type === 'monthly'  ? parseInt(document.getElementById('prog-dom').value, 10) : null,
+    nthWeekdayOccurrence: type === 'monthly-nth-weekday' ? parseInt(document.getElementById('prog-nth-occurrence').value, 10) : null,
     date:           type === 'onetime'  ? date : null,
     repeatUntil:    type === 'onetime'  ? null : repeatUntil,
     startTime,
     endTime:        document.getElementById('prog-end-time').value || null,
     venue,
-    description:    document.getElementById('prog-description').value.trim()
+    description:    document.getElementById('prog-description').value.trim(),
+    announceLead: announceLead || null
   };
 
   const existingPrograms = DB.getPrograms().filter(p => p.id !== _editProgId);

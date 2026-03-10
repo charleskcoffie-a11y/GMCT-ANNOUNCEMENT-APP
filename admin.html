@@ -44,6 +44,7 @@
         <a href="#" class="nav-item" onclick="showTab('programs',this)"><span class="ni">📅</span><span class="nl">Programs</span></a>
         <a href="#" class="nav-item" onclick="showTab('events',this)"><span class="ni">🎉</span><span class="nl">Social Activities</span></a>
         <a href="#" class="nav-item" onclick="showTab('announcements',this)"><span class="ni">📢</span><span class="nl">Announcements</span></a>
+        <a href="#" class="nav-item" onclick="showTab('archive',this)"><span class="ni">📦</span><span class="nl">Archive</span></a>
         <a href="#" class="nav-item" onclick="showTab('settings',this)"><span class="ni">⚙️</span><span class="nl">Settings</span></a>
       </nav>
       <div class="sidebar-footer">
@@ -124,6 +125,17 @@
               <tr><td colspan="3" class="empty-row">No announcements added yet</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ── ARCHIVE TAB ──────────────────────── -->
+      <div id="tab-archive" class="tab-content hidden">
+        <div class="section-toolbar">
+          <h3>Past Events Archive</h3>
+          <p style="font-size:.88rem;color:#666;margin:0;">Grouped by year and month. Click to expand/collapse.</p>
+        </div>
+        <div id="archive-container" style="padding:16px;">
+          <p style="color:#999;text-align:center;padding:40px 20px;">No past events yet</p>
         </div>
       </div>
 
@@ -268,6 +280,7 @@
               <option value="weekly">Weekly (every week)</option>
               <option value="biweekly">Biweekly (every 2 weeks)</option>
               <option value="monthly">Monthly (same date each month)</option>
+              <option value="monthly-nth-weekday">Monthly (e.g. 3rd Saturday)</option>
               <option value="onetime">One-Time</option>
             </select>
           </div>
@@ -297,6 +310,16 @@
               <option value="28">28th</option>
             </select>
           </div>
+          <div class="form-group hidden" id="prog-nth-occurrence-group">
+            <label>Which Occurrence? *</label>
+            <select id="prog-nth-occurrence" class="form-input">
+              <option value="1">1st</option>
+              <option value="2">2nd</option>
+              <option value="3">3rd</option>
+              <option value="4">4th</option>
+              <option value="5">5th</option>
+            </select>
+          </div>
           <div class="form-group hidden" id="prog-date-group">
             <label>Specific Date *</label>
             <input type="date" id="prog-date" class="form-input" />
@@ -304,6 +327,10 @@
           <div class="form-group" id="prog-repeat-until-group">
             <label>Repeat Until (optional)</label>
             <input type="date" id="prog-repeat-until" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Announce Lead Time (days) <small style="color:#888;">(optional – show announcement X days before)</small></label>
+            <input type="number" id="prog-announce-lead-days" class="form-input" min="0" max="90" placeholder="e.g. 14 for 2 weeks" />
           </div>
           <div class="form-group">
             <label>Start Time *</label>
