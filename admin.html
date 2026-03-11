@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <style>html, body { overflow: auto !important; }</style>
 </head>
 <body class="admin-body">
 
@@ -43,6 +44,7 @@
         <a href="#" class="nav-item active" onclick="showTab('dashboard',this)"><span class="ni">📊</span><span class="nl">Dashboard</span></a>
         <a href="#" class="nav-item" onclick="showTab('programs',this)"><span class="ni">📅</span><span class="nl">Programs</span></a>
         <a href="#" class="nav-item" onclick="showTab('events',this)"><span class="ni">🎉</span><span class="nl">Social Activities</span></a>
+        <a href="#" class="nav-item" onclick="showTab('flyers',this)"><span class="ni">🖼️</span><span class="nl">Flyers</span></a>
         <a href="#" class="nav-item" onclick="showTab('announcements',this)"><span class="ni">📢</span><span class="nl">Announcements</span></a>
         <a href="#" class="nav-item" onclick="showTab('archive',this)"><span class="ni">📦</span><span class="nl">Archive</span></a>
         <a href="#" class="nav-item" onclick="showTab('settings',this)"><span class="ni">⚙️</span><span class="nl">Settings</span></a>
@@ -107,6 +109,24 @@
             </tr></thead>
             <tbody id="events-tbody">
               <tr><td colspan="7" class="empty-row">No social activities added yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── FLYERS TAB ─────────────────────────── -->
+      <div id="tab-flyers" class="tab-content hidden">
+        <div class="section-toolbar">
+          <h3>Manage Flyers</h3>
+          <button class="btn btn-primary" onclick="openFlyerModal()">+ Add Flyer</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Preview</th><th>Panel</th><th>Date Window</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="flyers-tbody">
+              <tr><td colspan="5" class="empty-row">No flyers added yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -206,11 +226,43 @@
                 <span>Auto-reload display if a runtime error happens</span>
               </label>
             </div>
+            <div class="form-group full-width">
+              <label>Church Logo</label>
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                <div id="logo-preview-wrap" style="width:80px;height:80px;border-radius:50%;overflow:hidden;background:rgba(26,35,126,.12);border:2px solid #dde;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <img id="logo-preview-img" alt="Logo preview" style="width:100%;height:100%;object-fit:contain;display:none;" />
+                  <span id="logo-preview-placeholder" style="font-size:2rem;">&#10013;</span>
+                </div>
+                <div style="flex:1;min-width:200px;">
+                  <input type="file" id="set-church-logo" class="form-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="previewLogoSelection(this.files)" />
+                  <p style="margin:6px 0 0;color:#666;font-size:.78rem;">Accepted: JPG, PNG, WebP, SVG. Replaces the &#10013; cross in the display header.</p>
+                  <button type="button" class="btn btn-sm btn-outline" style="margin-top:6px;" onclick="removeLogo()">Remove Logo (restore cross)</button>
+                </div>
+              </div>
+            </div>
           </div>
           <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:4px;">Save Settings</button>
           <p style="margin:10px 0 0;color:#666;font-size:.82rem;line-height:1.5;">
             Security hardening enabled: login lockout after repeated failures and automatic logout after inactivity.
           </p>
+
+          <h3 style="margin-top:28px;">&#9729; Cloudinary Image Hosting <span style="font-size:.75rem;font-weight:400;color:#1a237e;background:#e8eaf6;padding:2px 8px;border-radius:10px;margin-left:6px;">Free tier &mdash; stores flyer images in the cloud</span></h3>
+          <p style="margin:0 0 12px;color:#555;font-size:.82rem;line-height:1.6;">
+            Sign up free at <strong>cloudinary.com</strong>, then go to <em>Settings &rarr; Upload &rarr; Upload presets</em> and add an <strong>unsigned</strong> preset.
+            Paste your <strong>Cloud name</strong> and <strong>Upload preset name</strong> below. Once set, all new flyer images will be stored on Cloudinary
+            and accessible from any device &mdash; no size limits.
+          </p>
+          <div class="form-grid two-col">
+            <div class="form-group">
+              <label>Cloud Name</label>
+              <input type="text" id="set-cloudinary-cloud" class="form-input" placeholder="e.g. my-church-cloud" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label>Upload Preset (unsigned)</label>
+              <input type="text" id="set-cloudinary-preset" class="form-input" placeholder="e.g. gmct_flyers" autocomplete="off" />
+            </div>
+          </div>
+          <div id="cloudinary-status" style="margin:6px 0 0;font-size:.82rem;"></div>
 
           <h3 style="margin-top:28px;">Backup and Restore</h3>
           <div class="form-grid">
@@ -220,7 +272,7 @@
             <div class="form-group">
               <label>Import Backup (JSON)</label>
               <input type="file" id="backup-file" class="form-input" accept="application/json,.json" onchange="importBackup(this.files)" />
-              <p style="margin-top:6px;color:#666;font-size:.78rem;line-height:1.45;">Import replaces current programs, social activities, announcements, and settings.</p>
+              <p style="margin-top:6px;color:#666;font-size:.78rem;line-height:1.45;">Import replaces current programs, social activities, flyers, announcements, and settings.</p>
             </div>
           </div>
 
@@ -329,6 +381,10 @@
             <input type="date" id="prog-repeat-until" class="form-input" />
           </div>
           <div class="form-group">
+            <label>Show From Date <small style="color:#888;">(optional – start showing on display from this date)</small></label>
+            <input type="date" id="prog-show-from" class="form-input" />
+          </div>
+          <div class="form-group">
             <label>Announce Lead Time (days) <small style="color:#888;">(optional – show announcement X days before)</small></label>
             <input type="number" id="prog-announce-lead-days" class="form-input" min="0" max="90" placeholder="e.g. 14 for 2 weeks" />
           </div>
@@ -394,6 +450,10 @@
             <textarea id="evt-description" class="form-input" rows="3" placeholder="Brief activity description..."></textarea>
           </div>
           <div class="form-group">
+            <label>Show From Date <small style="color:#888;">(optional – start showing on display from this date)</small></label>
+            <input type="date" id="evt-show-from" class="form-input" />
+          </div>
+          <div class="form-group">
             <label class="checkbox-label">
               <input type="checkbox" id="evt-featured" />
               <span>Mark as Featured Activity</span>
@@ -404,6 +464,69 @@
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="closeEventModal()">Cancel</button>
         <button class="btn btn-primary" onclick="saveEvent()">Save Activity</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       FLYER MODAL
+  ══════════════════════════════════════════════ -->
+  <div id="flyer-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="flyer-modal-title">Add Flyer</h3>
+        <button class="modal-close" onclick="closeFlyerModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="flyer-id" />
+        <div class="form-grid two-col">
+          <div class="form-group">
+            <label>Show On Panel *</label>
+            <select id="flyer-side" class="form-input">
+              <option value="programs">Upcoming Programs</option>
+              <option value="social">Social Activities</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Flyer Title (optional)</label>
+            <input type="text" id="flyer-title" class="form-input" placeholder="e.g. Youth Retreat Poster" />
+          </div>
+          <div class="form-group">
+            <label>Show From Date *</label>
+            <input type="date" id="flyer-start-date" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Stop Showing Date (optional)</label>
+            <input type="date" id="flyer-end-date" class="form-input" />
+          </div>
+          <div class="form-group full-width">
+            <label>Flyer Image *</label>
+            <input type="file" id="flyer-image-file" class="form-input" accept="image/png,image/jpeg,image/webp" onchange="previewFlyerSelection(this.files)" />
+            <p style="margin-top:6px;color:#666;font-size:.78rem;line-height:1.45;">Accepted formats: JPG, PNG, WebP. Max file size: 3MB. If editing, leave empty to keep current image.</p>
+          </div>
+          <div class="form-group full-width hidden" id="flyer-preview-wrap">
+            <label>Preview</label>
+            <div class="flyer-admin-preview">
+              <img id="flyer-preview-img" alt="Flyer preview" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="flyer-show-dates" checked />
+              <span>Show dates (From / To) on display</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="flyer-active" checked />
+              <span>Active – include in rotation</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeFlyerModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveFlyer()">Save Flyer</button>
       </div>
     </div>
   </div>

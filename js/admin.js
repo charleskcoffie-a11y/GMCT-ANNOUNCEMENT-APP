@@ -24,6 +24,10 @@ let _activityListenersBound = false;
 let _cloudUiListenerBound = false;
 let _cloudUiRefreshTimer = null;
 
+/* ── Logo upload state ─────────────────────── */
+let _pendingLogoFile = null;
+let _removeLogo = false;
+
 function getAuthMeta () {
   try {
     return JSON.parse(localStorage.getItem(AUTH_META_KEY)) || { failCount: 0, lockedUntil: 0 };
@@ -115,10 +119,6 @@ function checkSession () {
 }
 
 async function doLogin () {
-  if (window.CloudSync && typeof window.CloudSync.bootstrap === 'function') {
-    await window.CloudSync.bootstrap();
-  }
-
   const pwInput = document.getElementById('login-password');
   const errorEl = document.getElementById('login-error');
   const pw      = pwInput.value;
@@ -134,6 +134,8 @@ async function doLogin () {
     return;
   }
 
+  // Check password against local settings FIRST, before any cloud sync
+  // that could overwrite the stored password mid-login.
   if (pw === DB.getSettings().adminPassword) {
     clearFailedLoginState();
     sessionStorage.setItem('gmct_admin', 'true');
@@ -141,6 +143,10 @@ async function doLogin () {
     errorEl.classList.add('hidden');
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('admin-panel').classList.remove('hidden');
+    // Bootstrap cloud sync after login succeeds
+    if (window.CloudSync && typeof window.CloudSync.bootstrap === 'function') {
+      await window.CloudSync.bootstrap();
+    }
     initAdmin();
   } else {
     const next = recordFailedLogin();
@@ -178,12 +184,13 @@ function showTab (name, navEl) {
   if (tab) { tab.classList.remove('hidden'); tab.classList.add('active'); }
   if (navEl) navEl.classList.add('active');
 
-  const titles = { dashboard:'Dashboard', programs:'Programs', events:'Social Activities', announcements:'Announcements', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', programs:'Programs', events:'Social Activities', flyers:'Flyers', announcements:'Announcements', settings:'Settings' };
   document.getElementById('page-heading').textContent = titles[name] || name;
 
   if      (name === 'dashboard')     loadDashboard();
   else if (name === 'programs')      loadProgramsTable();
   else if (name === 'events')        loadEventsTable();
+  else if (name === 'flyers')        loadFlyersTable();
   else if (name === 'announcements') loadAnnouncementsTable();
   else if (name === 'settings')      loadSettingsForm();
 }
@@ -210,6 +217,7 @@ function bindCloudUiRefresh () {
       if (!active) return;
       if (active.id === 'tab-programs') loadProgramsTable();
       else if (active.id === 'tab-events') loadEventsTable();
+      else if (active.id === 'tab-flyers') loadFlyersTable();
       else if (active.id === 'tab-announcements') loadAnnouncementsTable();
       else if (active.id === 'tab-settings') loadSettingsForm();
     }, 120);
@@ -535,7 +543,7 @@ function loadProgramsTable () {
 function openProgramModal () {
   _editProgId = null;
   document.getElementById('program-modal-title').textContent = 'Add Program';
-  ['prog-id','prog-title','prog-date','prog-repeat-until','prog-start-time','prog-end-time','prog-venue','prog-description','prog-announce-lead-days']
+  ['prog-id','prog-title','prog-date','prog-repeat-until','prog-start-time','prog-end-time','prog-venue','prog-description','prog-announce-lead-days','prog-show-from']
     .forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('prog-category').value = 'service';
   document.getElementById('prog-type').value = 'weekly';
@@ -568,6 +576,7 @@ function editProgram (id) {
   document.getElementById('prog-venue').value       = p.venue;
   document.getElementById('prog-description').value = p.description || '';
   document.getElementById('prog-announce-lead-days').value = p.announceLead || '';
+  document.getElementById('prog-show-from').value = p.showFrom || '';
   toggleProgDateFields();
   document.getElementById('program-modal').classList.remove('hidden');
 }
@@ -632,7 +641,8 @@ function saveProgram () {
     endTime:        document.getElementById('prog-end-time').value || null,
     venue,
     description:    document.getElementById('prog-description').value.trim(),
-    announceLead: announceLead || null
+    announceLead: announceLead || null,
+    showFrom: document.getElementById('prog-show-from').value || null
   };
 
   const existingPrograms = DB.getPrograms().filter(p => p.id !== _editProgId);
@@ -694,9 +704,10 @@ function loadEventsTable () {
 function openEventModal () {
   _editEvtId = null;
   document.getElementById('event-modal-title').textContent = 'Add Social Activity';
-  ['evt-id','evt-title','evt-start-date','evt-end-date','evt-time','evt-venue','evt-description']
+  ['evt-id','evt-title','evt-start-date','evt-end-date','evt-time','evt-venue','evt-description','evt-show-from']
     .forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('evt-featured').checked = false;
+  document.getElementById('evt-show-from').value = toIsoDateLocal(getStartOfToday());
   document.getElementById('event-modal').classList.remove('hidden');
 }
 
@@ -712,6 +723,7 @@ function editEvent (id) {
   document.getElementById('evt-time').value        = e.time || '';
   document.getElementById('evt-venue').value       = e.venue;
   document.getElementById('evt-description').value = e.description || '';
+  document.getElementById('evt-show-from').value    = e.showFrom || '';
   document.getElementById('evt-featured').checked  = e.featured || false;
   document.getElementById('event-modal').classList.remove('hidden');
 }
@@ -737,6 +749,7 @@ function saveEvent () {
     time:        document.getElementById('evt-time').value        || null,
     venue,
     description: document.getElementById('evt-description').value.trim(),
+    showFrom:    document.getElementById('evt-show-from').value || null,
     featured:    document.getElementById('evt-featured').checked
   };
 
@@ -755,6 +768,313 @@ function deleteEvent (id) {
   loadEventsTable();
   loadDashboard();
   toast('Social activity deleted', 'info');
+}
+
+/* ════════════════════════════════════════════════════
+   FLYERS CRUD
+   ════════════════════════════════════════════════════ */
+let _editFlyerId = null;
+let _flyerSelectedFile = null;
+let _flyerPreviewObjectUrl = null;
+
+const FLYER_MAX_FILE_BYTES = 3 * 1024 * 1024;
+const FLYER_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function getFlyerPanelLabel (side) {
+  return side === 'social' ? 'Social Activities' : 'Upcoming Programs';
+}
+
+function sortFlyersForAdmin (flyers) {
+  return [...flyers].sort((a, b) => {
+    const sideA = a.side || 'programs';
+    const sideB = b.side || 'programs';
+    if (sideA !== sideB) return sideA.localeCompare(sideB);
+
+    const startA = a.startDate || '';
+    const startB = b.startDate || '';
+    if (startA !== startB) return startA.localeCompare(startB);
+
+    return Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0);
+  });
+}
+
+function getFlyerDateWindowLabel (flyer) {
+  const start = flyer.startDate ? fmtDate(flyer.startDate) : '--';
+  const end = flyer.endDate || flyer.startDate;
+  if (end && end !== flyer.startDate) return `${start} — ${fmtDate(end)}`;
+  return start;
+}
+
+function getFlyerTimelineStatus (flyer, todayIso = toIsoDateLocal(getStartOfToday())) {
+  const end = flyer.endDate || flyer.startDate;
+
+  if (!flyer.active) return { label: 'Inactive', cls: 'inactive' };
+  if (flyer.startDate && todayIso < flyer.startDate) return { label: 'Upcoming', cls: 'upcoming' };
+  if (end && todayIso > end) return { label: 'Expired', cls: 'expired' };
+  return { label: 'Live', cls: 'live' };
+}
+
+function releaseFlyerPreviewObjectUrl () {
+  if (_flyerPreviewObjectUrl) {
+    URL.revokeObjectURL(_flyerPreviewObjectUrl);
+    _flyerPreviewObjectUrl = null;
+  }
+}
+
+function setFlyerPreviewImage (src) {
+  const wrap = document.getElementById('flyer-preview-wrap');
+  const img = document.getElementById('flyer-preview-img');
+  if (!wrap || !img) return;
+
+  if (!src) {
+    img.removeAttribute('src');
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  img.src = src;
+  wrap.classList.remove('hidden');
+}
+
+function loadFlyersTable () {
+  const list = sortFlyersForAdmin(DB.getFlyers());
+  const tbody = document.getElementById('flyers-tbody');
+  if (!tbody) return;
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No flyers yet – click "+ Add Flyer" to start.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(f => {
+    const status = getFlyerTimelineStatus(f);
+    return `
+      <tr>
+        <td class="flyer-preview-cell"><img class="flyer-thumb" src="${esc(f.imageUrl || f.imageData)}" alt="${esc(f.title || 'Flyer preview')}" loading="lazy" /></td>
+        <td><span class="flyer-side-badge flyer-side-${esc(f.side || 'programs')}">${esc(getFlyerPanelLabel(f.side))}</span></td>
+        <td>${esc(getFlyerDateWindowLabel(f))}</td>
+        <td><span class="flyer-status-badge flyer-status-${esc(status.cls)}">${esc(status.label)}</span></td>
+        <td><div class="action-group">
+          <button class="btn btn-sm btn-outline" onclick="editFlyer('${esc(f.id)}')">Edit</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleFlyerActive('${esc(f.id)}')">${f.active ? 'Deactivate' : 'Activate'}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteFlyer('${esc(f.id)}')">Delete</button>
+        </div></td>
+      </tr>`;
+  }).join('');
+}
+
+function openFlyerModal () {
+  _editFlyerId = null;
+  _flyerSelectedFile = null;
+  releaseFlyerPreviewObjectUrl();
+
+  document.getElementById('flyer-modal-title').textContent = 'Add Flyer';
+  document.getElementById('flyer-id').value = '';
+  document.getElementById('flyer-side').value = 'programs';
+  document.getElementById('flyer-title').value = '';
+  document.getElementById('flyer-start-date').value = toIsoDateLocal(getStartOfToday());
+  document.getElementById('flyer-end-date').value = '';
+  document.getElementById('flyer-show-dates').checked = true;
+  document.getElementById('flyer-active').checked = true;
+  document.getElementById('flyer-image-file').value = '';
+  setFlyerPreviewImage('');
+
+  document.getElementById('flyer-modal').classList.remove('hidden');
+}
+
+function editFlyer (id) {
+  const flyer = DB.getFlyers().find(x => x.id === id);
+  if (!flyer) return;
+
+  _editFlyerId = id;
+  _flyerSelectedFile = null;
+  releaseFlyerPreviewObjectUrl();
+
+  document.getElementById('flyer-modal-title').textContent = 'Edit Flyer';
+  document.getElementById('flyer-id').value = flyer.id;
+  document.getElementById('flyer-side').value = flyer.side || 'programs';
+  document.getElementById('flyer-title').value = flyer.title || '';
+  document.getElementById('flyer-start-date').value = flyer.startDate || '';
+  document.getElementById('flyer-end-date').value = flyer.endDate || '';
+  document.getElementById('flyer-show-dates').checked = flyer.showDates !== false;
+  document.getElementById('flyer-active').checked = flyer.active !== false;
+  document.getElementById('flyer-image-file').value = '';
+
+  setFlyerPreviewImage(flyer.imageData || '');
+  document.getElementById('flyer-modal').classList.remove('hidden');
+}
+
+function closeFlyerModal () {
+  document.getElementById('flyer-modal').classList.add('hidden');
+  _flyerSelectedFile = null;
+  releaseFlyerPreviewObjectUrl();
+  setFlyerPreviewImage('');
+  const fileInput = document.getElementById('flyer-image-file');
+  if (fileInput) fileInput.value = '';
+}
+
+function previewFlyerSelection (files) {
+  const fileInput = document.getElementById('flyer-image-file');
+  const file = files && files[0];
+
+  if (!file) {
+    _flyerSelectedFile = null;
+    const existing = _editFlyerId ? DB.getFlyers().find(x => x.id === _editFlyerId) : null;
+    releaseFlyerPreviewObjectUrl();
+    setFlyerPreviewImage(existing && existing.imageUrl ? existing.imageUrl : '');
+    return;
+  }
+
+  if (!FLYER_ALLOWED_MIME_TYPES.includes(file.type)) {
+    toast('Please choose a JPG, PNG, or WebP image', 'error');
+    _flyerSelectedFile = null;
+    if (fileInput) fileInput.value = '';
+    return;
+  }
+  if (file.size > FLYER_MAX_FILE_BYTES) {
+    toast('Flyer image must be 3MB or less', 'error');
+    _flyerSelectedFile = null;
+    if (fileInput) fileInput.value = '';
+    return;
+  }
+
+  _flyerSelectedFile = file;
+  releaseFlyerPreviewObjectUrl();
+  _flyerPreviewObjectUrl = URL.createObjectURL(file);
+  setFlyerPreviewImage(_flyerPreviewObjectUrl);
+}
+
+function encodeImageAsBase64 (file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadToCloudinary (file, cloudName, preset) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', preset);
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
+    { method: 'POST', body: formData }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error && err.error.message ? err.error.message : `Upload failed (HTTP ${res.status})`);
+  }
+  const data = await res.json();
+  return data.secure_url;
+}
+
+async function saveFlyer () {
+  const side = document.getElementById('flyer-side').value === 'social' ? 'social' : 'programs';
+  const title = document.getElementById('flyer-title').value.trim();
+  const startDate = document.getElementById('flyer-start-date').value;
+  const rawEndDate = document.getElementById('flyer-end-date').value;
+  const endDate = rawEndDate || null;  // null means no expiry
+  const active = document.getElementById('flyer-active').checked;
+
+  if (!startDate) {
+    toast('Please select a start date for the flyer', 'error');
+    return;
+  }
+  if (endDate && endDate < startDate) {
+    toast('End date cannot be earlier than start date', 'error');
+    return;
+  }
+
+  const list = DB.getFlyers();
+  const existing = _editFlyerId ? list.find(f => f.id === _editFlyerId) : null;
+
+  if (!existing && !_flyerSelectedFile) {
+    toast('Please select a flyer image to upload', 'error');
+    return;
+  }
+
+  // Image will be encoded as Base64 when saving (no upload needed)
+
+  let imageData = existing ? (existing.imageData || '') : '';
+  let imageUrl  = existing ? (existing.imageUrl  || '') : '';
+
+  if (_flyerSelectedFile) {
+    const s = DB.getSettings();
+    if (s.cloudinaryCloud && s.cloudinaryPreset) {
+      // Upload to Cloudinary — returns a permanent URL
+      toast('Uploading image to Cloudinary…', 'info');
+      try {
+        imageUrl  = await uploadToCloudinary(_flyerSelectedFile, s.cloudinaryCloud, s.cloudinaryPreset);
+        imageData = ''; // clear any old local Base64 blob
+      } catch (err) {
+        console.error('Cloudinary upload failed', err);
+        toast('Cloudinary upload failed: ' + err.message, 'error');
+        return;
+      }
+    } else {
+      // Fallback: encode as Base64 and store locally
+      try {
+        imageData = await encodeImageAsBase64(_flyerSelectedFile);
+        imageUrl  = '';
+      } catch (err) {
+        console.error('Image encoding failed', err);
+        toast('Could not encode image. Try selecting a different file.', 'error');
+        return;
+      }
+    }
+  }
+
+  const flyer = {
+    id: existing ? existing.id : genId(),
+    side,
+    title,
+    startDate,
+    endDate,
+    imageData,
+    imageUrl,
+    showDates: document.getElementById('flyer-show-dates').checked,
+    active,
+    createdAtMs: existing ? Number(existing.createdAtMs || Date.now()) : Date.now(),
+    updatedAtMs: Date.now()
+  };
+
+  const next = existing
+    ? list.map(f => f.id === existing.id ? flyer : f)
+    : [...list, flyer];
+
+  DB.saveFlyers(next);
+
+  closeFlyerModal();
+  loadFlyersTable();
+  loadDashboard();
+  toast('Flyer saved!');
+}
+
+function toggleFlyerActive (id) {
+  const list = DB.getFlyers().map(f => f.id === id ? { ...f, active: !f.active, updatedAtMs: Date.now() } : f);
+  DB.saveFlyers(list);
+  loadFlyersTable();
+  loadDashboard();
+}
+
+async function deleteFlyer (id) {
+  const list = DB.getFlyers();
+  const flyer = list.find(f => f.id === id);
+  if (!flyer) return;
+  if (!confirm('Delete this flyer?')) return;
+
+  DB.saveFlyers(list.filter(f => f.id !== id));
+  loadFlyersTable();
+  loadDashboard();
+  toast('Flyer deleted', 'info');
+
+  if (flyer.storagePath) {
+    const removed = await deleteFlyerStorageAsset(flyer.storagePath, flyer.storageBucket || null);
+    if (!removed) {
+      toast('Flyer removed, but cloud image cleanup failed', 'info');
+    }
+  }
 }
 
 /* ════════════════════════════════════════════════════
@@ -865,6 +1185,33 @@ function sanitizeDailyReloadTime (value) {
 
 const VALID_TRANSITIONS = ['fade', 'fly', 'zoom', 'flip', 'wipe', 'morph', 'glitch'];
 
+/* ── Logo helpers ─────────────────────────── */
+function previewLogoSelection (files) {
+  if (!files || !files[0]) return;
+  const file = files[0];
+  _pendingLogoFile = file;
+  _removeLogo = false;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('logo-preview-img');
+    const ph  = document.getElementById('logo-preview-placeholder');
+    if (img) { img.src = e.target.result; img.style.display = 'block'; }
+    if (ph)  { ph.style.display = 'none'; }
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLogo () {
+  _pendingLogoFile = null;
+  _removeLogo = true;
+  const img = document.getElementById('logo-preview-img');
+  const ph  = document.getElementById('logo-preview-placeholder');
+  const inp = document.getElementById('set-church-logo');
+  if (img) { img.src = ''; img.style.display = 'none'; }
+  if (ph)  { ph.style.display = ''; }
+  if (inp) { inp.value = ''; }
+}
+
 function pickTransition (pickerId, hiddenId, btn) {
   const picker = document.getElementById(pickerId);
   const hidden = document.getElementById(hiddenId);
@@ -911,11 +1258,37 @@ function loadSettingsForm () {
   setTransitionPicker('prog-tx-picker',   'set-program-transition', s.programTransition || 'fade');
   setTransitionPicker('social-tx-picker', 'set-social-transition',  s.socialTransition  || 'fade');
 
+  // Cloudinary
+  const cloudEl   = document.getElementById('set-cloudinary-cloud');
+  const presetEl  = document.getElementById('set-cloudinary-preset');
+  const statusEl  = document.getElementById('cloudinary-status');
+  if (cloudEl)  cloudEl.value  = s.cloudinaryCloud  || '';
+  if (presetEl) presetEl.value = s.cloudinaryPreset || '';
+  if (statusEl) {
+    if (s.cloudinaryCloud && s.cloudinaryPreset) {
+      statusEl.innerHTML = '<span style="color:#2e7d32;">&#10003; Cloudinary configured — new flyers will be uploaded to the cloud.</span>';
+    } else {
+      statusEl.innerHTML = '<span style="color:#888;">Not configured — flyer images stored locally in this browser only.</span>';
+    }
+  }
+  const logoImg = document.getElementById('logo-preview-img');
+  const logoPlaceholder = document.getElementById('logo-preview-placeholder');
+  if (logoImg && logoPlaceholder) {
+    if (s.churchLogo) {
+      logoImg.src = s.churchLogo;
+      logoImg.style.display = 'block';
+      logoPlaceholder.style.display = 'none';
+    } else {
+      logoImg.style.display = 'none';
+      logoPlaceholder.style.display = '';
+    }
+  }
+
   const backupInput = document.getElementById('backup-file');
   if (backupInput) backupInput.value = '';
 }
 
-function saveSettings () {
+async function saveSettings () {
   const s = DB.getSettings();
   const programSwitch = clampInt(document.getElementById('set-program-switch-seconds').value, 5, 60, 10);
   const socialSwitch = clampInt(document.getElementById('set-social-switch-seconds').value, 5, 60, 10);
@@ -935,6 +1308,26 @@ function saveSettings () {
   s.programTransition = VALID_TRANSITIONS.includes(progTx)   ? progTx   : 'fade';
   s.socialTransition  = VALID_TRANSITIONS.includes(socialTx) ? socialTx : 'fade';
 
+  // Cloudinary
+  const cloudVal  = (document.getElementById('set-cloudinary-cloud')  || {}).value  || '';
+  const presetVal = (document.getElementById('set-cloudinary-preset') || {}).value || '';
+  s.cloudinaryCloud  = cloudVal.trim();
+  s.cloudinaryPreset = presetVal.trim();
+
+  // Save logo if a new one was selected
+  const logoFile = _pendingLogoFile;
+  if (logoFile) {
+    try {
+      s.churchLogo = await encodeImageAsBase64(logoFile);
+      _pendingLogoFile = null;
+    } catch (err) {
+      console.error('Logo encode failed', err);
+    }
+  } else if (_removeLogo) {
+    s.churchLogo = null;
+    _removeLogo = false;
+  }
+
   DB.saveSettings(s);
   startAdminSessionWatchdog();
   showMsg('settings-msg', '✓ Settings saved successfully!');
@@ -953,6 +1346,7 @@ function parseBackupPayload (raw) {
   return {
     programs: src.programs,
     events: src.events,
+    flyers: Array.isArray(src.flyers) ? src.flyers : [],
     announcements: src.announcements,
     settings: src.settings
   };
@@ -965,6 +1359,7 @@ function exportBackup () {
     data: {
       programs: DB.getPrograms(),
       events: DB.getEvents(),
+      flyers: DB.getFlyers(),
       announcements: DB.getAnnouncements(),
       settings: DB.getSettings()
     }
@@ -1002,6 +1397,7 @@ function importBackup (files) {
 
       DB.savePrograms(parsed.programs);
       DB.saveEvents(parsed.events);
+      DB.saveFlyers(parsed.flyers);
       DB.saveAnnouncements(parsed.announcements);
 
       const mergedSettings = Object.assign({}, DB.getSettings(), parsed.settings || {});
@@ -1014,6 +1410,7 @@ function importBackup (files) {
       loadDashboard();
       loadProgramsTable();
       loadEventsTable();
+      loadFlyersTable();
       loadAnnouncementsTable();
       loadSettingsForm();
       showMsg('settings-msg', '✓ Backup imported successfully!');

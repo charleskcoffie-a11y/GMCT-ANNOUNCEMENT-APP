@@ -6,6 +6,7 @@
 const KEYS = {
   PROGRAMS:      'gmct_programs',
   EVENTS:        'gmct_events',
+  FLYERS:        'gmct_flyers',
   ANNOUNCEMENTS: 'gmct_announcements',
   SETTINGS:      'gmct_settings'
 };
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS = {
 const CLOUD_SYNC_KEYS = [
   KEYS.PROGRAMS,
   KEYS.EVENTS,
+  KEYS.FLYERS,
   KEYS.ANNOUNCEMENTS,
   KEYS.SETTINGS
 ];
@@ -44,11 +46,13 @@ const DB = {
 
   getPrograms ()      { return this._get(KEYS.PROGRAMS)      || []; },
   getEvents ()        { return this._get(KEYS.EVENTS)        || []; },
+  getFlyers ()        { return this._get(KEYS.FLYERS)        || []; },
   getAnnouncements () { return this._get(KEYS.ANNOUNCEMENTS) || []; },
   getSettings ()      { return Object.assign({}, DEFAULT_SETTINGS, this._get(KEYS.SETTINGS) || {}); },
 
   savePrograms (d)      { this._set(KEYS.PROGRAMS, d);      },
   saveEvents (d)        { this._set(KEYS.EVENTS, d);        },
+  saveFlyers (d)        { this._set(KEYS.FLYERS, d);        },
   saveAnnouncements (d) { this._set(KEYS.ANNOUNCEMENTS, d); },
   saveSettings (d)      { this._set(KEYS.SETTINGS, d);      }
 };
@@ -121,17 +125,37 @@ const CloudSync = {
 
     const hasPrograms = Array.isArray(payload.programs);
     const hasEvents = Array.isArray(payload.events);
+    const hasFlyers = Array.isArray(payload.flyers);
     const hasAnnouncements = Array.isArray(payload.announcements);
     const hasSettings = payload.settings && typeof payload.settings === 'object';
-    if (!hasPrograms && !hasEvents && !hasAnnouncements && !hasSettings) return;
+    if (!hasPrograms && !hasEvents && !hasFlyers && !hasAnnouncements && !hasSettings) return;
 
     this._suppressPush = true;
     try {
       if (hasPrograms) localStorage.setItem(KEYS.PROGRAMS, JSON.stringify(payload.programs));
       if (hasEvents) localStorage.setItem(KEYS.EVENTS, JSON.stringify(payload.events));
+      if (hasFlyers) {
+        // imageData (Base64) is never synced — restore from local store.
+        // imageUrl (Cloudinary) comes from Firestore and is the source of truth.
+        const localFlyers = DB._get(KEYS.FLYERS) || [];
+        const localMap = {};
+        localFlyers.forEach(f => { if (f.id) localMap[f.id] = f.imageData || ''; });
+        const merged = payload.flyers.map(f => {
+          const copy = Object.assign({}, f);
+          // Only restore local Base64 if there's no cloud URL for this flyer
+          if (!copy.imageUrl) copy.imageData = localMap[f.id] || '';
+          return copy;
+        });
+        localStorage.setItem(KEYS.FLYERS, JSON.stringify(merged));
+      }
       if (hasAnnouncements) localStorage.setItem(KEYS.ANNOUNCEMENTS, JSON.stringify(payload.announcements));
       if (hasSettings) {
+        // Preserve churchLogo from local storage — it is never synced to
+        // Firestore (binary is too large), so we must not overwrite it.
+        const localSettings = DB._get(KEYS.SETTINGS);
+        const localLogo = localSettings && localSettings.churchLogo ? localSettings.churchLogo : null;
         const merged = Object.assign({}, DEFAULT_SETTINGS, payload.settings);
+        if (localLogo) merged.churchLogo = localLogo;
         localStorage.setItem(KEYS.SETTINGS, JSON.stringify(merged));
       }
     } finally {
@@ -183,13 +207,27 @@ const CloudSync = {
     const ok = await this.init();
     if (!ok || !this._docRef) return false;
 
+    // Strip churchLogo from the cloud payload — large binary data doesn't
+    // belong in Firestore and risks exceeding the 1 MB document limit.
+    const settingsForCloud = Object.assign({}, DB.getSettings());
+    delete settingsForCloud.churchLogo;
+
+    // Strip imageData from flyers — binary blobs would exceed Firestore's 1 MB
+    // document limit. Only flyer metadata is synced; images stay in localStorage.
+    const flyersForCloud = DB.getFlyers().map(f => {
+      const copy = Object.assign({}, f);
+      delete copy.imageData;
+      return copy;
+    });
+
     const payload = {
       schemaVersion: 1,
       updatedAtMs: Date.now(),
       programs: DB.getPrograms(),
       events: DB.getEvents(),
+      flyers: flyersForCloud,
       announcements: DB.getAnnouncements(),
-      settings: DB.getSettings()
+      settings: settingsForCloud
     };
 
     this._lastAppliedVersion = payload.updatedAtMs;

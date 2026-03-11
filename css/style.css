@@ -59,8 +59,15 @@ body { font-family:var(--font); color:var(--gray-900); }
   color: var(--gold);
   filter: drop-shadow(0 0 14px rgba(255,179,0,.7));
 }
-.hd-left, .hd-right { flex-shrink: 0; }
-.hd-center { text-align: center; flex: 1; padding: 0 20px; }
+.hd-left .church-logo {
+  max-height: 80px;
+  max-width: 160px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,.35));
+}
+.hd-left, .hd-right { flex-shrink: 0; flex-basis: 220px; }
+.hd-center { text-align: center; flex: 1; padding: 0 20px; min-width: 0; }
+
 .church-name {
   font-family: var(--serif);
   font-size: clamp(1.8rem, 3vw, 3.2rem);
@@ -77,12 +84,13 @@ body { font-family:var(--font); color:var(--gray-900); }
   letter-spacing: 1.5px;
   margin-top: 6px;
 }
-.hd-right { text-align: right; }
+.hd-right { text-align: right; min-width: 220px; }
 .live-time {
-  font-size: clamp(2rem, 3vw, 3.2rem);
+  font-size: clamp(1.6rem, 2.3vw, 2.6rem);
   font-weight: 700;
   color: var(--white);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .live-date {
   font-size: clamp(.9rem, 1.1vw, 1.2rem);
@@ -476,6 +484,76 @@ body { font-family:var(--font); color:var(--gray-900); }
   -webkit-line-clamp: 2;
 }
 
+/* Panel flyers */
+.panel-flyer-slide {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255,179,0,.35);
+  overflow: hidden;
+  background: rgba(3, 6, 25, .78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.panel-flyer-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: rgba(0,0,0,.35);
+}
+.panel-flyer-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 5px 10px;
+  padding: 10px 14px 20px;
+  background: linear-gradient(to bottom, rgba(0,0,0,.78) 0%, rgba(0,0,0,0) 100%);
+  pointer-events: none;
+}
+.panel-flyer-chip {
+  background: rgba(0,0,0,.58);
+  color: var(--white);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 10px;
+  padding: 5px 12px;
+  font-size: .78rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-flyer-chip.from-chip {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  justify-self: end;
+}
+.panel-flyer-chip-spacer {
+  grid-column: 1;
+  grid-row: 2;
+}
+.panel-flyer-chip.to-chip {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: right;
+  justify-self: end;
+}
+.panel-flyer-chip.date {
+  color: #ffe0c2;
+  border-color: rgba(255,200,150,.35);
+  background: rgba(0,0,0,.65);
+}
+
 .no-content {
   color: rgba(255,255,255,.3);
   text-align: center;
@@ -565,6 +643,19 @@ body { font-family:var(--font); color:var(--gray-900); }
   text-shadow: 0 0 16px rgba(244, 98, 47, 0.45), 
                0 0 30px rgba(244, 98, 47, 0.25),
                2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.ticker-sep {
+  display: inline-block;
+  margin: 0 12px;
+  color: #ffb300;
+  font-weight: 900;
+  text-shadow: 0 0 8px rgba(255, 179, 0, 0.6), 
+               0 0 16px rgba(244, 98, 47, 0.4);
+}
+
+.ticker-msg {
+  display: inline;
 }
 
 @keyframes ticker {
@@ -765,6 +856,51 @@ body { font-family:var(--font); color:var(--gray-900); }
 .cat-prayer     { background:#fff3e0; color:#e65100; }
 .cat-youth      { background:#fce4ec; color:#880e4f; }
 .cat-other      { background:var(--gray-200); color:var(--gray-700); }
+
+.flyer-preview-cell { width: 118px; }
+.flyer-thumb {
+  width: 96px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--gray-200);
+  background: #000;
+  display: block;
+}
+.flyer-side-badge,
+.flyer-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.flyer-side-programs { background: #e8eaf6; color: #1a237e; }
+.flyer-side-social   { background: #f3e5f5; color: #6a1b9a; }
+.flyer-status-live     { background: #e8f5e9; color: #1b5e20; }
+.flyer-status-upcoming { background: #e3f2fd; color: #0d47a1; }
+.flyer-status-expired  { background: #f5f5f5; color: #616161; }
+.flyer-status-inactive { background: #ffebee; color: #b71c1c; }
+
+.flyer-admin-preview {
+  width: 100%;
+  max-width: 360px;
+  height: 220px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: #060a2d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.flyer-admin-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 
 .action-group { display: flex; gap: 6px; }
 
