@@ -38,7 +38,18 @@ const CLOUD_SYNC_KEYS = [
 const DB = {
   _get (key)       { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
   _set (key, val)  {
-    localStorage.setItem(key, JSON.stringify(val));
+    try {
+      localStorage.setItem(key, JSON.stringify(val));
+    } catch (e) {
+      if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        console.error('localStorage quota exceeded for key:', key, '- data not saved locally.');
+        if (typeof window !== 'undefined' && typeof window.toast === 'function') {
+          window.toast('Storage full — upload flyers to Cloudinary to free up space.', 'error');
+        }
+      } else {
+        throw e;
+      }
+    }
     if (window.CloudSync && typeof window.CloudSync.queuePush === 'function') {
       window.CloudSync.queuePush(key);
     }
@@ -150,12 +161,13 @@ const CloudSync = {
       }
       if (hasAnnouncements) localStorage.setItem(KEYS.ANNOUNCEMENTS, JSON.stringify(payload.announcements));
       if (hasSettings) {
-        // Preserve churchLogo from local storage — it is never synced to
-        // Firestore (binary is too large), so we must not overwrite it.
+        // churchLogo handling:
+        //  - If Firestore has a URL (Cloudinary), that is the source of truth.
+        //  - If Firestore has no logo, preserve the local copy (Base64 or URL).
         const localSettings = DB._get(KEYS.SETTINGS);
         const localLogo = localSettings && localSettings.churchLogo ? localSettings.churchLogo : null;
         const merged = Object.assign({}, DEFAULT_SETTINGS, payload.settings);
-        if (localLogo) merged.churchLogo = localLogo;
+        if (!merged.churchLogo && localLogo) merged.churchLogo = localLogo;
         localStorage.setItem(KEYS.SETTINGS, JSON.stringify(merged));
       }
     } finally {
@@ -207,10 +219,12 @@ const CloudSync = {
     const ok = await this.init();
     if (!ok || !this._docRef) return false;
 
-    // Strip churchLogo from the cloud payload — large binary data doesn't
-    // belong in Firestore and risks exceeding the 1 MB document limit.
+    // If churchLogo is a URL (Cloudinary), it is small enough for Firestore — keep it.
+    // If it is a Base64 blob (starts with 'data:'), strip it to avoid the 1 MB limit.
     const settingsForCloud = Object.assign({}, DB.getSettings());
-    delete settingsForCloud.churchLogo;
+    if (settingsForCloud.churchLogo && settingsForCloud.churchLogo.startsWith('data:')) {
+      delete settingsForCloud.churchLogo;
+    }
 
     // Strip imageData from flyers — binary blobs would exceed Firestore's 1 MB
     // document limit. Only flyer metadata is synced; images stay in localStorage.

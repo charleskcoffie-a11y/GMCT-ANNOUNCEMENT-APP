@@ -1318,10 +1318,17 @@ async function saveSettings () {
   const logoFile = _pendingLogoFile;
   if (logoFile) {
     try {
-      s.churchLogo = await encodeImageAsBase64(logoFile);
+      // Upload to Cloudinary if configured (URL is tiny vs Base64 blob)
+      if (s.cloudinaryCloud && s.cloudinaryPreset) {
+        toast('Uploading logo to Cloudinary…', 'info');
+        s.churchLogo = await uploadToCloudinary(logoFile, s.cloudinaryCloud, s.cloudinaryPreset);
+      } else {
+        s.churchLogo = await encodeImageAsBase64(logoFile);
+      }
       _pendingLogoFile = null;
     } catch (err) {
-      console.error('Logo encode failed', err);
+      console.error('Logo save failed', err);
+      toast('Logo upload failed: ' + err.message, 'error');
     }
   } else if (_removeLogo) {
     s.churchLogo = null;
