@@ -5,9 +5,10 @@ A local HTML/CSS/JavaScript church announcement display application for **GMCT �
 ## Features
 
 - **Split-panel display** — Upcoming Programs (2×2 grid) and Social Activities side by side
+- **Panel flyer rotation** — upload dated flyers for either panel; flyers run first, then normal text cards resume
 - **Rolling cards** — pages automatically cycle with 7 selectable transition styles (Fade, Fly In, Zoom, Flip 3D, Wipe, Morph, Glitch)
 - **Live ticker** — scrolling announcement bar at the bottom
-- **Admin panel** — full CRUD for Programs, Social Activities, and Announcements
+- **Admin panel** — full CRUD for Programs, Social Activities, Flyers, and Announcements
 - **Recurrence engine** — supports one-time, weekly, bi-weekly, and monthly repeating programs with optional end dates
 - **Conflict detection** — warns when two programs overlap at the same venue and time
 - **Smart auto-fit** — cards automatically switch to compact/dense layout to prevent overflow
@@ -15,7 +16,7 @@ A local HTML/CSS/JavaScript church announcement display application for **GMCT �
 - **Daily TV reload** — automatically reloads the display at a set time (default 4 AM)
 - **Backup & Restore** — export/import all data as a JSON file
 - **Security hardening** — admin login lockout after 5 failed attempts, inactivity session timeout
-- **Optional Firebase cloud sync** — share programs/events/announcements/settings across devices
+- **Optional Firebase cloud sync** — share programs/events/flyers/announcements/settings across devices
 
 ## Project Structure
 
@@ -34,16 +35,15 @@ A local HTML/CSS/JavaScript church announcement display application for **GMCT �
 
 1. Open `index.html` in a browser for the display screen (TV / projector).
 2. Open `admin.html` in a browser to manage content.
-3. Default admin password: `admin123` — **change it immediately** in Settings → Change Admin Password.
+3. Use the **Flyers** tab to upload image flyers for either panel and set the active date window.
+4. Default admin password: `admin123` — **change it immediately** in Settings → Change Admin Password.
 
 > All data is stored in the browser's `localStorage`. No server or internet connection required.
 
 ## Live Site (GitHub Pages)
 
-| Page | URL |
-|------|-----|
-| 📺 Display | https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/ |
-| ⚙️ Admin Panel | https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html |
+- 📺 Display: [https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/](https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/)
+- ⚙️ Admin Panel: [https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html](https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html)
 
 ## Deployment
 

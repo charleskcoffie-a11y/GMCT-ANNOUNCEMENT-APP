@@ -14,7 +14,7 @@ window.GMCT_FIREBASE_CONFIG = {
   apiKey: 'AIzaSyATzWRb3PwmwUGYMJ-cyfd5I6D5RC1DD0c',
   authDomain: 'gmct-announcement.firebaseapp.com',
   projectId: 'gmct-announcement',
-  storageBucket: 'gmct-announcement.firebasestorage.app',
+  storageBucket: 'gmct-announcement.appspot.com',
   messagingSenderId: '112212748992',
   appId: '1:112212748992:web:1b1b70df7d023a71da9b25',
   measurementId: 'G-B9R9M5JQZF'

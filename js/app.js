@@ -12,7 +12,9 @@ const SOCIAL_PER_PAGE = 2;
 
 const _rollTimers = {
   programs: null,
-  social: null
+  social: null,
+  programs_page: 0,
+  social_page: 0
 };
 
 let _displayRefreshTimer = null;
@@ -59,6 +61,21 @@ function applySettings () {
   const t = document.getElementById('disp-church-tagline');
   if (n) n.textContent = FIXED_HEADER_TITLE;
   if (t) t.textContent = FIXED_HEADER_SUBTITLE;
+
+  // Apply church logo
+  const cross = document.getElementById('hd-cross');
+  const logo  = document.getElementById('hd-logo');
+  if (cross && logo) {
+    const logoData = DB.getSettings().churchLogo;
+    if (logoData) {
+      logo.src = logoData;
+      logo.classList.remove('hidden');
+      cross.classList.add('hidden');
+    } else {
+      logo.classList.add('hidden');
+      cross.classList.remove('hidden');
+    }
+  }
 }
 
 function toIsoDate (dateObj) {
@@ -198,6 +215,9 @@ function getUpcomingPrograms () {
       const nextDay = new Date(nextDate + 'T00:00:00');
       if (nextDay < today) return null;
 
+      const todayIso = toIsoDate(today);
+      if (p.showFrom && todayIso < p.showFrom) return null;
+
       return { ...p, nextDate };
     })
     .filter(Boolean)
@@ -207,14 +227,75 @@ function getUpcomingPrograms () {
     });
 }
 
+function getActiveFlyersForSide (side) {
+  const today = getStartOfDay();
+
+  return DB.getFlyers()
+    .filter(f => (f.side || 'programs') === side)
+    .filter(f => f.active !== false)
+    .filter(f => {
+      if ((!f.imageData && !f.imageUrl) || !f.startDate) return false;
+      const start = new Date(f.startDate + 'T00:00:00');
+      if (Number.isNaN(start.getTime())) return false;
+      if (today < start) return false;
+      // Only enforce an expiry when a *distinct* stop date was explicitly set
+      // (endDate === startDate was the old fallback, not a real expiry)
+      if (f.endDate && f.endDate !== f.startDate) {
+        const end = new Date(f.endDate + 'T23:59:59');
+        if (!Number.isNaN(end.getTime()) && today > end) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const startA = a.startDate || '';
+      const startB = b.startDate || '';
+      if (startA !== startB) return startA.localeCompare(startB);
+      return Number(a.createdAtMs || 0) - Number(b.createdAtMs || 0);
+    });
+}
+
+function getFlyerDateLabel (flyer) {
+  const start = flyer.startDate;
+  const end = flyer.endDate || flyer.startDate;
+  if (!start) return '';
+  if (end && end !== start) return `${fmtDate(start)} - ${fmtDate(end)}`;
+  return fmtDate(start);
+}
+
+function renderFlyerPage (flyer, side) {
+  const title = flyer.title || (side === 'social' ? 'Social Activity Flyer' : 'Upcoming Program Flyer');
+  const start = flyer.startDate ? fmtDate(flyer.startDate) : '';
+  const end   = (flyer.endDate && flyer.endDate !== flyer.startDate) ? fmtDate(flyer.endDate) : '';
+  const imageSrc = flyer.imageUrl || flyer.imageData || '';
+  const showDates = flyer.showDates !== false;
+
+  const datesHtml = showDates ? `
+          <span class="panel-flyer-chip-spacer"></span>
+          <span class="panel-flyer-chip date from-chip">${start ? 'From: ' + esc(start) : ''}</span>
+          <span class="panel-flyer-chip-spacer"></span>
+          <span class="panel-flyer-chip date to-chip">${end ? 'To: ' + esc(end) : ''}</span>` : '';
+
+  return {
+    html: `
+      <div class="panel-flyer-slide">
+        <img src="${esc(imageSrc)}" alt="${esc(title)}" loading="lazy" />
+        ${showDates ? `<div class="panel-flyer-meta">${datesHtml}</div>` : ''}
+      </div>`,
+    autoFit: false,
+    flyer: true
+  };
+}
+
 function renderPrograms () {
   const list = getUpcomingPrograms();
+  const flyers = getActiveFlyersForSide('programs');
   renderRollingCards({
     containerId: 'programs-list',
     items: list,
     pageSize: PROGRAMS_PER_PAGE,
     emptyHtml: '<div class="no-content">No upcoming programs yet</div>',
     timerKey: 'programs',
+    introPages: flyers.map(f => renderFlyerPage(f, 'programs')),
     renderCard: p => {
       const full = fmt12(p.startTime) || '--:--';
       const timeParts = full.split(' ');
@@ -249,10 +330,13 @@ function renderPrograms () {
 /* ── Social activities ───────────────────────────── */
 function getUpcomingSocialActivities () {
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayIso = toIsoDate(today);
   return DB.getEvents()
     .filter(e => {
       const end = new Date((e.endDate || e.startDate) + 'T23:59:59');
-      return end >= today;
+      if (end < today) return false;
+      if (e.showFrom && todayIso < e.showFrom) return false;
+      return true;
     })
     .sort((a, b) => {
       if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
@@ -265,12 +349,14 @@ function getUpcomingSocialActivities () {
 
 function renderSocialActivities () {
   const list = getUpcomingSocialActivities();
+  const flyers = getActiveFlyersForSide('social');
   renderRollingCards({
     containerId: 'social-list',
     items: list,
     pageSize: SOCIAL_PER_PAGE,
     emptyHtml: '<div class="no-content">No upcoming social activities</div>',
     timerKey: 'social',
+    introPages: flyers.map(f => renderFlyerPage(f, 'social')),
     renderCard: e => {
       const days = daysUntil(e.startDate);
       let countdownLabel = '';
@@ -301,6 +387,7 @@ function clearRollingTimer (timerKey) {
     clearInterval(_rollTimers[timerKey]);
     _rollTimers[timerKey] = null;
   }
+  // page index preserved intentionally so rotation continues from same spot after refresh
 }
 
 function clampInt (value, min, max, fallback) {
@@ -393,34 +480,55 @@ function queueDisplayRefresh () {
   _storageSyncTimer = setTimeout(refreshDisplay, 120);
 }
 
-function renderRollingCards ({ containerId, items, pageSize, emptyHtml, timerKey, renderCard }) {
+function renderRollingCards ({ containerId, items, pageSize, emptyHtml, timerKey, renderCard, introPages = [] }) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
   clearRollingTimer(timerKey);
 
-  if (!items.length) {
+  const pages = [];
+  if (Array.isArray(introPages)) {
+    introPages.forEach(page => {
+      if (page && typeof page.html === 'string') pages.push(page);
+    });
+  }
+
+  if (items.length) {
+    for (let i = 0; i < items.length; i += pageSize) {
+      const chunk = items.slice(i, i + pageSize);
+      pages.push({
+        html: chunk.map(renderCard).join(''),
+        autoFit: true,
+        flyer: false
+      });
+    }
+  }
+
+  if (!pages.length) {
+    el.classList.remove('panel-showing-flyer');
     el.innerHTML = emptyHtml;
     return;
   }
 
-  const pages = [];
-  for (let i = 0; i < items.length; i += pageSize) {
-    pages.push(items.slice(i, i + pageSize));
-  }
-
-  let pageIndex = 0;
+  // Resume from saved position so refreshDisplay never resets mid-cycle
+  const savedIndex = _rollTimers[timerKey + '_page'] || 0;
+  let pageIndex = savedIndex < pages.length ? savedIndex : 0;
   let firstDraw = true;
 
   const swap = () => {
-    el.innerHTML = pages[pageIndex].map(renderCard).join('');
-    applyAutoFitForCards(el);
+    const page = pages[pageIndex];
+    el.innerHTML = page.html;
+    el.classList.toggle('panel-showing-flyer', !!page.flyer);
+
+    if (page.autoFit !== false) applyAutoFitForCards(el);
+
     requestAnimationFrame(() => {
-      applyAutoFitForCards(el);
+      if (page.autoFit !== false) applyAutoFitForCards(el);
       el.classList.add('roll-enter');
       setTimeout(() => el.classList.remove('roll-enter'), 450);
     });
     pageIndex = (pageIndex + 1) % pages.length;
+    _rollTimers[timerKey + '_page'] = pageIndex; // save so refresh can resume here
   };
 
   const drawPage = () => {
@@ -456,13 +564,16 @@ function renderTicker () {
   const active = DB.getAnnouncements().filter(a => a.active);
   const s = DB.getSettings();
 
-  el.textContent = active.length
-    ? active.map(a => a.text).join('  \u2022  ') + '  \u2022  '
-    : `Welcome to ${FIXED_HEADER_TITLE}  \u2022  God bless you  \u2022  `;
+  if (active.length) {
+    const msgs = active.map(a => `<span class="ticker-msg">${a.text}</span>`).join('<span class="ticker-sep">◆</span>');
+    el.innerHTML = msgs + '<span class="ticker-sep">◆</span>';
+  } else {
+    el.innerHTML = `Welcome to ${FIXED_HEADER_TITLE}<span class="ticker-sep">◆</span>God bless you<span class="ticker-sep">◆</span>`;
+  }
 
   // Calculate duration based on speed setting
   const speed    = Math.max(10, s.tickerSpeed || 40);
-  const textPx   = el.textContent.length * 9;          // ~9px/char estimate
+  const textPx   = (el.textContent || '').length * 9;  // ~9px/char estimate
   const totalPx  = window.innerWidth + textPx;
   const duration = Math.max(10, Math.round(totalPx / speed));
 
