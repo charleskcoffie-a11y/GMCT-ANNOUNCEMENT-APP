@@ -7,7 +7,7 @@ const FIXED_DISPLAY_SUBTITLE = 'Upcoming Programs and Social Activities';
 const AUTH_META_KEY = 'gmct_auth_meta';
 const AUTH_MAX_ATTEMPTS = 5;
 const AUTH_LOCKOUT_MS = 5 * 60 * 1000;
-const DEFAULT_ADMIN_TIMEOUT_MINUTES = 30;
+const DEFAULT_ADMIN_TIMEOUT_MINUTES = 5;
 
 const WEEKDAY_INDEX = {
   Sunday: 0,
@@ -184,7 +184,7 @@ function showTab (name, navEl) {
   if (tab) { tab.classList.remove('hidden'); tab.classList.add('active'); }
   if (navEl) navEl.classList.add('active');
 
-  const titles = { dashboard:'Dashboard', programs:'Programs', events:'Social Activities', flyers:'Flyers', announcements:'Announcements', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', programs:'Programs', events:'Social Activities', flyers:'Flyers', announcements:'Announcements', leaders:'Hall of Fame', archive:'Archive', settings:'Settings' };
   document.getElementById('page-heading').textContent = titles[name] || name;
 
   if      (name === 'dashboard')     loadDashboard();
@@ -192,6 +192,7 @@ function showTab (name, navEl) {
   else if (name === 'events')        loadEventsTable();
   else if (name === 'flyers')        loadFlyersTable();
   else if (name === 'announcements') loadAnnouncementsTable();
+  else if (name === 'leaders')       loadLeadersTable();
   else if (name === 'settings')      loadSettingsForm();
 }
 
@@ -219,6 +220,7 @@ function bindCloudUiRefresh () {
       else if (active.id === 'tab-events') loadEventsTable();
       else if (active.id === 'tab-flyers') loadFlyersTable();
       else if (active.id === 'tab-announcements') loadAnnouncementsTable();
+      else if (active.id === 'tab-leaders') loadLeadersTable();
       else if (active.id === 'tab-settings') loadSettingsForm();
     }, 120);
   });
@@ -293,6 +295,7 @@ function loadDashboard () {
     events.filter(e => new Date((e.endDate || e.startDate) + 'T23:59:59') >= today)
   );
 
+  const leaders         = DB.getLeaders();
   document.getElementById('stat-programs').textContent      = programs.length;
   document.getElementById('stat-events').textContent        = events.length;
   document.getElementById('stat-announcements').textContent = announcements.filter(a => a.active).length;
@@ -1165,6 +1168,353 @@ function deleteAnnouncement (id) {
 }
 
 /* ════════════════════════════════════════════════════
+   HALL OF FAME / LEADERS CRUD
+   ════════════════════════════════════════════════════ */
+let _editLeaderId = null;
+let _removeLeaderPhoto = false;
+
+const LEADER_MIN_YEAR = 1900;
+
+function getLeaderCurrentYear () {
+  return new Date().getFullYear();
+}
+
+function parseLeaderYear (value) {
+  const y = parseInt(value, 10);
+  if (!Number.isFinite(y)) return null;
+  const max = getLeaderCurrentYear() + 1;
+  if (y < LEADER_MIN_YEAR || y > max) return null;
+  return y;
+}
+
+function getLeaderServiceYearsLabel (leader) {
+  const fromYear = parseLeaderYear(leader.fromYear);
+  const toYear = parseLeaderYear(leader.toYear);
+  if (leader.status === 'current') return fromYear ? `${fromYear} - Present` : 'Present';
+  if (fromYear && toYear) return `${fromYear} - ${toYear}`;
+  if (fromYear) return `${fromYear}`;
+  if (toYear) return `${toYear}`;
+  return '—';
+}
+
+function getLeaderSortAnchorYear (leader) {
+  if (leader.status === 'current') return getLeaderCurrentYear() + 1;
+  return parseLeaderYear(leader.toYear) || parseLeaderYear(leader.fromYear) || 0;
+}
+
+function leaderNeedsDisplayOrder (title) {
+  const lower = String(title || '').toLowerCase();
+  return lower.includes('minister') || lower.includes('bishop');
+}
+
+function parseLeaderDisplayOrder (value) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function getLeaderDisplayOrderForSort (leader) {
+  const n = parseLeaderDisplayOrder(leader.displayOrder);
+  return n === null ? Number.MAX_SAFE_INTEGER : n;
+}
+
+function compareOrderedLeadersWithinRole (a, b, roleA, roleB) {
+  const orderA = parseLeaderDisplayOrder(a.displayOrder);
+  const orderB = parseLeaderDisplayOrder(b.displayOrder);
+  const hasA = orderA !== null;
+  const hasB = orderB !== null;
+
+  if (!hasA && !hasB) return null;
+  if (hasA && hasB && orderA !== orderB) return orderA - orderB;
+  if (hasA && !hasB) return -1;
+  if (!hasA && hasB) return 1;
+
+  const nameDiff = (a.name || '').localeCompare(b.name || '');
+  if (nameDiff !== 0) return nameDiff;
+  return (a.id || '').localeCompare(b.id || '');
+}
+
+function getLeaderRoleSortKey (title) {
+  const lower = String(title || '').trim().toLowerCase();
+  if (!lower) return 'other-leaders';
+  if (lower.includes('minister')) return 'ministers';
+  if (lower.includes('bishop')) return 'bishops';
+  if (lower.includes('steward')) return 'stewards';
+  if (lower.includes('pastor')) return 'pastors';
+  if (lower.includes('elder')) return 'elders';
+  return lower;
+}
+
+function getLeadersSortedByYears () {
+  return DB.getLeaders()
+    .filter(l => l && l.name && l.title)
+    .sort((a, b) => {
+      const roleA = getLeaderRoleSortKey(a.title);
+      const roleB = getLeaderRoleSortKey(b.title);
+
+      const orderedCompare = compareOrderedLeadersWithinRole(a, b, roleA, roleB);
+      if (orderedCompare !== null) return orderedCompare;
+
+      const anchorDiff = getLeaderSortAnchorYear(b) - getLeaderSortAnchorYear(a);
+      if (anchorDiff !== 0) return anchorDiff;
+
+      const fromDiff = (parseLeaderYear(b.fromYear) || 0) - (parseLeaderYear(a.fromYear) || 0);
+      if (fromDiff !== 0) return fromDiff;
+
+      return (a.name || '').localeCompare(b.name || '');
+    });
+}
+
+function toggleLeaderYearInputs () {
+  const status = document.getElementById('leader-status').value;
+  const toYearGroup = document.getElementById('leader-to-year-group');
+  const toYearInput = document.getElementById('leader-to-year');
+  if (!toYearGroup || !toYearInput) return;
+
+  const isFormer = status === 'former';
+  toYearGroup.classList.toggle('hidden', !isFormer);
+  toYearInput.required = isFormer;
+}
+
+function loadLeadersTable () {
+  const list  = getLeadersSortedByYears();
+  const tbody = document.getElementById('leaders-tbody');
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No leaders added yet – click "+ Add Leader" to start.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(l => `
+    <tr>
+      <td>${esc(l.name || '')}</td>
+      <td>${esc(l.title || '')}</td>
+      <td>${leaderNeedsDisplayOrder(l.title) ? esc(String(parseLeaderDisplayOrder(l.displayOrder) || '—')) : '—'}</td>
+      <td>${esc(getLeaderServiceYearsLabel(l))}</td>
+      <td>
+        <button class="btn btn-sm ${l.status === 'current' ? 'btn-primary' : 'btn-outline'}"
+                onclick="toggleLeaderStatus('${esc(l.id)}')">
+          ${l.status === 'current' ? '👑 Current' : '📜 Former'}
+        </button>
+      </td>
+      <td>${l.photoUrl ? '<img src="' + esc(l.photoUrl) + '" alt="photo" style="width:40px;height:40px;border-radius:6px;object-fit:cover;" />' : '—'}</td>
+      <td><div class="action-group">
+        <button class="btn btn-sm btn-outline" onclick="editLeader('${esc(l.id)}')">Edit</button>
+        <button class="btn btn-sm btn-danger"  onclick="deleteLeader('${esc(l.id)}')">Delete</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+function openLeaderModal () {
+  _editLeaderId = null;
+  _removeLeaderPhoto = false;
+  document.getElementById('leader-modal-title').textContent = 'Add Leader';
+  document.getElementById('leader-id').value           = '';
+  document.getElementById('leader-name').value         = '';
+  document.getElementById('leader-title').value        = '';
+  document.getElementById('leader-display-order').value = '';
+  document.getElementById('leader-status').value       = 'current';
+  document.getElementById('leader-from-year').value    = '';
+  document.getElementById('leader-to-year').value      = '';
+  document.getElementById('leader-bio').value          = '';
+  document.getElementById('leader-photo-file').value   = '';
+  document.getElementById('leader-photo-preview-wrap').classList.add('hidden');
+  document.getElementById('leader-photo-preview-img').src = '';
+  const removePhotoBtn = document.getElementById('leader-remove-photo-btn');
+  if (removePhotoBtn) removePhotoBtn.style.display = 'none';
+  document.getElementById('leader-delete-btn').style.display = 'none';
+  document.getElementById('leader-modal').classList.remove('hidden');
+  toggleLeaderYearInputs();
+  document.getElementById('leader-name').focus();
+}
+
+function closeLeaderModal () {
+  _removeLeaderPhoto = false;
+  document.getElementById('leader-modal').classList.add('hidden');
+}
+
+function editLeader (id) {
+  const l = DB.getLeaders().find(x => x.id === id);
+  if (!l) return;
+  _editLeaderId = id;
+  _removeLeaderPhoto = false;
+  document.getElementById('leader-modal-title').textContent = 'Edit Leader';
+  document.getElementById('leader-id').value           = l.id;
+  document.getElementById('leader-name').value         = l.name || '';
+  document.getElementById('leader-title').value        = l.title || '';
+  document.getElementById('leader-display-order').value = parseLeaderDisplayOrder(l.displayOrder) || '';
+  document.getElementById('leader-status').value       = l.status || 'current';
+  document.getElementById('leader-from-year').value    = l.fromYear || '';
+  document.getElementById('leader-to-year').value      = l.toYear || '';
+  document.getElementById('leader-bio').value          = l.bio || '';
+  document.getElementById('leader-photo-file').value   = '';
+  const previewWrap = document.getElementById('leader-photo-preview-wrap');
+  const previewImg = document.getElementById('leader-photo-preview-img');
+  const removePhotoBtn = document.getElementById('leader-remove-photo-btn');
+  if (l.photoUrl) {
+    previewImg.src = l.photoUrl;
+    previewWrap.classList.remove('hidden');
+    if (removePhotoBtn) removePhotoBtn.style.display = 'inline-flex';
+  } else {
+    previewImg.src = '';
+    previewWrap.classList.add('hidden');
+    if (removePhotoBtn) removePhotoBtn.style.display = 'none';
+  }
+  document.getElementById('leader-delete-btn').style.display = 'block';
+  document.getElementById('leader-modal').classList.remove('hidden');
+  toggleLeaderYearInputs();
+  document.getElementById('leader-name').focus();
+}
+
+async function saveLeader () {
+  const name = document.getElementById('leader-name').value.trim();
+  const title = document.getElementById('leader-title').value.trim();
+  const displayOrderRaw = document.getElementById('leader-display-order').value.trim();
+  const status = document.getElementById('leader-status').value;
+  const fromYearRaw = document.getElementById('leader-from-year').value.trim();
+  const toYearRaw = document.getElementById('leader-to-year').value.trim();
+  const bio = document.getElementById('leader-bio').value.trim();
+  const needsOrder = leaderNeedsDisplayOrder(title);
+  const displayOrder = parseLeaderDisplayOrder(displayOrderRaw);
+  const maxYear = getLeaderCurrentYear() + 1;
+  const fromYear = parseLeaderYear(fromYearRaw);
+  const toYear = parseLeaderYear(toYearRaw);
+
+  if (!name || !title) {
+    toast('Please fill in Name and Title', 'error');
+    return;
+  }
+  if (needsOrder && !displayOrder) {
+    toast('Enter a valid Display Order (1+) for Ministers/Bishops', 'error');
+    return;
+  }
+  if (!fromYear) {
+    toast(`Enter a valid From Year (${LEADER_MIN_YEAR} - ${maxYear})`, 'error');
+    return;
+  }
+  if (status === 'former') {
+    if (!toYear) {
+      toast(`Enter a valid To Year (${LEADER_MIN_YEAR} - ${maxYear}) for Former leaders`, 'error');
+      return;
+    }
+    if (toYear < fromYear) {
+      toast('To Year cannot be earlier than From Year', 'error');
+      return;
+    }
+  }
+
+  const photoFile = document.getElementById('leader-photo-file').files[0] || null;
+  const s = DB.getSettings();
+  let photoUrl = null;
+
+  if (photoFile) {
+    if (s.cloudinaryCloud && s.cloudinaryPreset) {
+      try {
+        toast('Uploading photo to Cloudinary…', 'info');
+        photoUrl = await uploadToCloudinary(photoFile, s.cloudinaryCloud, s.cloudinaryPreset);
+      } catch (err) {
+        toast('Photo upload failed: ' + err.message, 'error');
+        return;
+      }
+    } else {
+      toast('Cloudinary is not configured — please set it up in Settings before adding photos.', 'error');
+      return;
+    }
+  }
+
+  const list = DB.getLeaders();
+  if (_editLeaderId) {
+    const idx = list.findIndex(l => l.id === _editLeaderId);
+    if (idx < 0) return;
+    const nextLeader = {
+      ...list[idx],
+      name, title, status, fromYear,
+      displayOrder: needsOrder ? displayOrder : null,
+      toYear: status === 'former' ? toYear : null,
+      bio
+    };
+    if (photoUrl !== null) nextLeader.photoUrl = photoUrl;
+    else if (_removeLeaderPhoto) nextLeader.photoUrl = '';
+    list[idx] = nextLeader;
+  } else {
+    list.push({
+      id: 'leader-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+      name, title, status,
+      displayOrder: needsOrder ? displayOrder : null,
+      fromYear,
+      toYear: status === 'former' ? toYear : null,
+      bio,
+      photoUrl: photoUrl || '',
+      createdAtMs: Date.now()
+    });
+  }
+  _removeLeaderPhoto = false;
+  DB.saveLeaders(list);
+  closeLeaderModal();
+  loadLeadersTable();
+  loadDashboard();
+  toast(_editLeaderId ? 'Leader updated' : 'Leader added', 'success');
+}
+
+function removeLeaderPhoto () {
+  _removeLeaderPhoto = true;
+  const fileInput = document.getElementById('leader-photo-file');
+  const previewWrap = document.getElementById('leader-photo-preview-wrap');
+  const previewImg = document.getElementById('leader-photo-preview-img');
+  const removePhotoBtn = document.getElementById('leader-remove-photo-btn');
+  if (fileInput) fileInput.value = '';
+  if (previewImg) previewImg.src = '';
+  if (previewWrap) previewWrap.classList.add('hidden');
+  if (removePhotoBtn) removePhotoBtn.style.display = 'none';
+  toast('Photo will be removed when you save', 'info');
+}
+
+function deleteEditingLeader () {
+  if (!_editLeaderId) return;
+  const didDelete = deleteLeader(_editLeaderId);
+  if (didDelete) closeLeaderModal();
+}
+
+function deleteLeader (id) {
+  if (!confirm('Delete this leader?')) return;
+  DB.saveLeaders(DB.getLeaders().filter(l => l.id !== id));
+  loadLeadersTable();
+  loadDashboard();
+  toast('Leader deleted', 'info');
+  return true;
+}
+
+function toggleLeaderStatus (id) {
+  const list = DB.getLeaders().map(l => {
+    if (l.id !== id) return l;
+    if (l.status === 'current') {
+      return { ...l, status: 'former', toYear: parseLeaderYear(l.toYear) || getLeaderCurrentYear() };
+    }
+    return { ...l, status: 'current', toYear: null };
+  });
+  DB.saveLeaders(list);
+  loadLeadersTable();
+}
+
+function previewLeaderPhotoSelection (files) {
+  if (files && files[0]) {
+    const f = files[0];
+    if (f.size > 2 * 1024 * 1024) {
+      toast('Photo must be smaller than 2MB', 'error');
+      document.getElementById('leader-photo-file').value = '';
+      return;
+    }
+    _removeLeaderPhoto = false;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('leader-photo-preview-img').src = e.target.result;
+      document.getElementById('leader-photo-preview-wrap').classList.remove('hidden');
+      const removePhotoBtn = document.getElementById('leader-remove-photo-btn');
+      if (removePhotoBtn) removePhotoBtn.style.display = 'inline-flex';
+    };
+    reader.readAsDataURL(f);
+  }
+}
+
+/* ════════════════════════════════════════════════════
    SETTINGS
    ════════════════════════════════════════════════════ */
 function clampInt (value, min, max, fallback) {
@@ -1238,6 +1588,8 @@ function loadSettingsForm () {
   const legacySwitch = clampInt(s.cardSwitchSeconds, 5, 60, 10);
   const programSwitch = clampInt(s.programSwitchSeconds, 5, 60, legacySwitch);
   const socialSwitch = clampInt(s.socialSwitchSeconds, 5, 60, legacySwitch);
+  const leaderSwitch = clampInt(s.leaderSwitchSeconds, 10, 60, 18);
+  const minItems = clampInt(s.minSocialItemsShowLeaders, 1, 8, 2);
   const timeoutMin = clampInt(s.adminSessionTimeoutMinutes, 5, 120, DEFAULT_ADMIN_TIMEOUT_MINUTES);
 
   document.getElementById('set-ticker-speed').value = speed;
@@ -1249,14 +1601,21 @@ function loadSettingsForm () {
   document.getElementById('set-social-switch-seconds').value = socialSwitch;
   document.getElementById('social-switch-seconds-val').textContent = socialSwitch;
 
+  document.getElementById('set-leader-switch-seconds').value = leaderSwitch;
+  document.getElementById('leader-switch-seconds-val').textContent = leaderSwitch;
+
+  document.getElementById('set-min-items-per-panel').value = minItems;
+  document.getElementById('min-items-val').textContent = minItems;
+
   document.getElementById('set-daily-reload-time').value = sanitizeDailyReloadTime(s.dailyReloadTime);
   document.getElementById('set-auto-reload-on-error').checked = s.autoReloadOnError !== false;
 
   document.getElementById('set-admin-session-timeout').value = timeoutMin;
   document.getElementById('admin-session-timeout-val').textContent = timeoutMin;
 
-  setTransitionPicker('prog-tx-picker',   'set-program-transition', s.programTransition || 'fade');
-  setTransitionPicker('social-tx-picker', 'set-social-transition',  s.socialTransition  || 'fade');
+  setTransitionPicker('prog-tx-picker',    'set-program-transition', s.programTransition || 'fade');
+  setTransitionPicker('social-tx-picker',  'set-social-transition',  s.socialTransition  || 'fade');
+  setTransitionPicker('leader-tx-picker',  'set-leader-transition',  s.leaderTransition  || 'fade');
 
   // Cloudinary
   const cloudEl   = document.getElementById('set-cloudinary-cloud');
@@ -1292,6 +1651,8 @@ async function saveSettings () {
   const s = DB.getSettings();
   const programSwitch = clampInt(document.getElementById('set-program-switch-seconds').value, 5, 60, 10);
   const socialSwitch = clampInt(document.getElementById('set-social-switch-seconds').value, 5, 60, 10);
+  const leaderSwitch = clampInt(document.getElementById('set-leader-switch-seconds').value, 10, 60, 18);
+  const minItems = clampInt(document.getElementById('set-min-items-per-panel').value, 1, 8, 2);
 
   s.churchName    = FIXED_DISPLAY_TITLE;
   s.churchTagline = FIXED_DISPLAY_SUBTITLE;
@@ -1299,14 +1660,18 @@ async function saveSettings () {
   s.cardSwitchSeconds = programSwitch; // Legacy fallback for older displays.
   s.programSwitchSeconds = programSwitch;
   s.socialSwitchSeconds = socialSwitch;
+  s.leaderSwitchSeconds = leaderSwitch;
+  s.minSocialItemsShowLeaders = minItems;
   s.dailyReloadTime = sanitizeDailyReloadTime(document.getElementById('set-daily-reload-time').value);
   s.autoReloadOnError = document.getElementById('set-auto-reload-on-error').checked;
   s.adminSessionTimeoutMinutes = clampInt(document.getElementById('set-admin-session-timeout').value, 5, 120, DEFAULT_ADMIN_TIMEOUT_MINUTES);
 
-  const progTx   = document.getElementById('set-program-transition').value;
-  const socialTx = document.getElementById('set-social-transition').value;
-  s.programTransition = VALID_TRANSITIONS.includes(progTx)   ? progTx   : 'fade';
-  s.socialTransition  = VALID_TRANSITIONS.includes(socialTx) ? socialTx : 'fade';
+  const progTx    = document.getElementById('set-program-transition').value;
+  const socialTx  = document.getElementById('set-social-transition').value;
+  const leaderTx  = document.getElementById('set-leader-transition').value;
+  s.programTransition = VALID_TRANSITIONS.includes(progTx)    ? progTx    : 'fade';
+  s.socialTransition  = VALID_TRANSITIONS.includes(socialTx)  ? socialTx  : 'fade';
+  s.leaderTransition  = VALID_TRANSITIONS.includes(leaderTx)  ? leaderTx  : 'fade';
 
   // Cloudinary
   const cloudVal  = (document.getElementById('set-cloudinary-cloud')  || {}).value  || '';

@@ -8,6 +8,7 @@ const KEYS = {
   EVENTS:        'gmct_events',
   FLYERS:        'gmct_flyers',
   ANNOUNCEMENTS: 'gmct_announcements',
+  LEADERS:       'gmct_leaders',
   SETTINGS:      'gmct_settings'
 };
 
@@ -19,14 +20,19 @@ const DEFAULT_SETTINGS = {
   cardSwitchSeconds: 10,
   programSwitchSeconds: 10,
   socialSwitchSeconds: 10,
+  leaderSwitchSeconds: 18,
   dailyReloadTime: '04:00',
   autoReloadOnError: true,
-  adminSessionTimeoutMinutes: 30,
+  adminSessionTimeoutMinutes: 5,
   programTransition: 'fade',
-  socialTransition: 'fade'
+  socialTransition: 'fade',
+  leaderTransition: 'fade',
+  hallOfFameEnabled: true,
+  minSocialItemsShowLeaders: 2
 };
 
 const CLOUD_SYNC_KEYS = [
+  KEYS.LEADERS,
   KEYS.PROGRAMS,
   KEYS.EVENTS,
   KEYS.FLYERS,
@@ -59,12 +65,14 @@ const DB = {
   getEvents ()        { return this._get(KEYS.EVENTS)        || []; },
   getFlyers ()        { return this._get(KEYS.FLYERS)        || []; },
   getAnnouncements () { return this._get(KEYS.ANNOUNCEMENTS) || []; },
+  getLeaders ()       { return this._get(KEYS.LEADERS)       || []; },
   getSettings ()      { return Object.assign({}, DEFAULT_SETTINGS, this._get(KEYS.SETTINGS) || {}); },
 
   savePrograms (d)      { this._set(KEYS.PROGRAMS, d);      },
   saveEvents (d)        { this._set(KEYS.EVENTS, d);        },
   saveFlyers (d)        { this._set(KEYS.FLYERS, d);        },
   saveAnnouncements (d) { this._set(KEYS.ANNOUNCEMENTS, d); },
+  saveLeaders (d)       { this._set(KEYS.LEADERS, d);       },
   saveSettings (d)      { this._set(KEYS.SETTINGS, d);      }
 };
 

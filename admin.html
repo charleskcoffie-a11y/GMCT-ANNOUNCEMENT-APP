@@ -46,6 +46,7 @@
         <a href="#" class="nav-item" onclick="showTab('events',this)"><span class="ni">🎉</span><span class="nl">Social Activities</span></a>
         <a href="#" class="nav-item" onclick="showTab('flyers',this)"><span class="ni">🖼️</span><span class="nl">Flyers</span></a>
         <a href="#" class="nav-item" onclick="showTab('announcements',this)"><span class="ni">📢</span><span class="nl">Announcements</span></a>
+        <a href="#" class="nav-item" onclick="showTab('leaders',this)"><span class="ni">👑</span><span class="nl">Hall of Fame</span></a>
         <a href="#" class="nav-item" onclick="showTab('archive',this)"><span class="ni">📦</span><span class="nl">Archive</span></a>
         <a href="#" class="nav-item" onclick="showTab('settings',this)"><span class="ni">⚙️</span><span class="nl">Settings</span></a>
       </nav>
@@ -148,6 +149,25 @@
         </div>
       </div>
 
+      <!-- ── HALL OF FAME / LEADERS TAB ─────────── -->
+      <div id="tab-leaders" class="tab-content hidden">
+        <div class="section-toolbar">
+          <h3>Hall of Fame - Leaders</h3>
+          <p style="font-size:.88rem;color:#666;margin:0;margin-bottom:12px;">Display past and current leaders and ministers. Click the status badge to toggle Current/Former.</p>
+          <button class="btn btn-primary" onclick="openLeaderModal()">+ Add Leader</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Name</th><th>Title/Role</th><th>Order</th><th>Service Years</th><th>Status</th><th>Image</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="leaders-tbody">
+              <tr><td colspan="7" class="empty-row">No leaders added yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ── ARCHIVE TAB ──────────────────────── -->
       <div id="tab-archive" class="tab-content hidden">
         <div class="section-toolbar">
@@ -186,6 +206,16 @@
               <label>Social Switch Timer <span id="social-switch-seconds-val" style="color:#1a237e;font-weight:700;">10</span> sec</label>
               <input type="range" id="set-social-switch-seconds" class="form-range" min="5" max="60" value="10" oninput="document.getElementById('social-switch-seconds-val').textContent=this.value" />
             </div>
+            <div class="form-group">
+              <label>Hall of Fame Leader Switch Timer <span id="leader-switch-seconds-val" style="color:#1a237e;font-weight:700;">18</span> sec</label>
+              <input type="range" id="set-leader-switch-seconds" class="form-range" min="10" max="60" value="18" oninput="document.getElementById('leader-switch-seconds-val').textContent=this.value" />
+              <p style="margin:4px 0 0;font-size:.78rem;color:#666;">Longer timer recommended for reading leader bio. Only shown when programs/social content is below threshold.</p>
+            </div>
+            <div class="form-group">
+              <label>Social Activities Threshold <span id="min-items-val" style="color:#1a237e;font-weight:700;">2</span></label>
+              <input type="range" id="set-min-items-per-panel" class="form-range" min="1" max="8" value="2" oninput="document.getElementById('min-items-val').textContent=this.value" />
+              <p style="margin:4px 0 0;font-size:.78rem;color:#666;">When Social Activities has fewer items than this number, the social panel is replaced with the Hall of Fame Leaders display.</p>
+            </div>
             <div class="form-group full-width">
               <label style="margin-bottom:4px;display:block;">Programs Panel &mdash; Card Transition Style</label>
               <div class="tx-picker" id="prog-tx-picker">
@@ -212,13 +242,25 @@
               </div>
               <input type="hidden" id="set-social-transition" value="fade" />
             </div>
-            <div class="form-group">
+            <div class="form-group full-width">
+              <label style="margin-bottom:4px;display:block;">Hall of Fame Leaders &mdash; Card Transition Style</label>
+              <div class="tx-picker" id="leader-tx-picker">
+                <button type="button" class="tx-opt" data-val="fade"   onclick="pickTransition('leader-tx-picker','set-leader-transition',this)">&#10022; Fade</button>
+                <button type="button" class="tx-opt" data-val="fly"    onclick="pickTransition('leader-tx-picker','set-leader-transition',this)">&rarr; Fly In</button>
+                <button type="button" class="tx-opt" data-val="zoom"   onclick="pickTransition('leader-tx-picker','set-leader-transition',this)">&#8853; Zoom</button>
+                <button type="button" class="tx-opt" data-val="flip"   onclick="pickTransition('leader-tx-picker','set-leader-transition',this)">&#10227; Flip 3D</button>
+                <button type="button" class="tx-opt" data-val="wipe"   onclick="pickTransition('leader-tx-picker','set-leader-transition',this)">&uarr; Wipe</button>
+                <button type="button" class="tx-opt" data-val="morph"  onclick="pickTransition('leader-tx-picker','set-leader-transition',this)">&#9689; Morph</button>
+                <button type="button" class="tx-opt" data-val="glitch" onclick="pickTransition('leader-tx-picker','set-leader-transition',this)">&#9889; Glitch</button>
+              </div>
+              <input type="hidden" id="set-leader-transition" value="fade" />
+            </div>
               <label>Daily TV Reload Time</label>
               <input type="time" id="set-daily-reload-time" class="form-input" value="04:00" />
             </div>
             <div class="form-group">
-              <label>Admin Session Timeout <span id="admin-session-timeout-val" style="color:#1a237e;font-weight:700;">30</span> min</label>
-              <input type="range" id="set-admin-session-timeout" class="form-range" min="5" max="120" value="30" oninput="document.getElementById('admin-session-timeout-val').textContent=this.value" />
+              <label>Admin Session Timeout <span id="admin-session-timeout-val" style="color:#1a237e;font-weight:700;">5</span> min</label>
+              <input type="range" id="set-admin-session-timeout" class="form-range" min="5" max="120" value="5" oninput="document.getElementById('admin-session-timeout-val').textContent=this.value" />
             </div>
             <div class="form-group full-width" style="margin-top:4px;">
               <label class="checkbox-label">
@@ -556,6 +598,71 @@
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="closeAnnouncementModal()">Cancel</button>
         <button class="btn btn-primary" onclick="saveAnnouncement()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       LEADER MODAL
+  ══════════════════════════════════════════════ -->
+  <div id="leader-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="leader-modal-title">Add Leader</h3>
+        <button class="modal-close" onclick="closeLeaderModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="leader-id" />
+        <div class="form-grid two-col">
+          <div class="form-group full-width">
+            <label>Full Name *</label>
+            <input type="text" id="leader-name" class="form-input" placeholder="e.g., Rev. John Smith" />
+          </div>
+          <div class="form-group">
+            <label>Title / Role *</label>
+            <input type="text" id="leader-title" class="form-input" placeholder="e.g., Senior Pastor" />
+          </div>
+          <div class="form-group">
+            <label>Display Order <span style="font-weight:400;color:#666;">(Ministers/Bishops)</span></label>
+            <input type="number" id="leader-display-order" class="form-input" min="1" max="999" placeholder="e.g., 1" />
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="leader-status" class="form-input" onchange="toggleLeaderYearInputs()">
+              <option value="current">Current Leader</option>
+              <option value="former">Former Leader</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>From Year *</label>
+            <input type="number" id="leader-from-year" class="form-input" min="1900" max="2100" placeholder="e.g., 2018" />
+          </div>
+          <div class="form-group" id="leader-to-year-group">
+            <label>To Year <span style="font-weight:400;color:#666;">(required for Former)</span></label>
+            <input type="number" id="leader-to-year" class="form-input" min="1900" max="2100" placeholder="e.g., 2023" />
+          </div>
+          <div class="form-group full-width">
+            <label>Bio / Description</label>
+            <textarea id="leader-bio" class="form-input" rows="3" placeholder="Brief bio (optional)"></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>Profile Photo (uploads to Cloudinary)</label>
+            <input type="file" id="leader-photo-file" class="form-input" accept="image/png,image/jpeg,image/webp" onchange="previewLeaderPhotoSelection(this.files)" />
+            <p style="margin-top:6px;color:#666;font-size:.78rem;">JPG, PNG, WebP. Max 2MB. If editing, leave empty to keep current photo.</p>
+            <button type="button" class="btn btn-sm btn-outline" id="leader-remove-photo-btn" onclick="removeLeaderPhoto()" style="margin-top:8px;display:none;">Remove Current Photo</button>
+          </div>
+          <div class="form-group full-width hidden" id="leader-photo-preview-wrap">
+            <label>Preview</label>
+            <div style="width:120px;height:120px;border-radius:12px;overflow:hidden;border:2px solid #dde;background:#f5f5f5;">
+              <img id="leader-photo-preview-img" alt="Photo preview" style="width:100%;height:100%;object-fit:cover;" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeLeaderModal()">Cancel</button>
+        <button class="btn btn-danger btn-sm" id="leader-delete-btn" onclick="deleteEditingLeader()" style="display:none;margin-right:auto;">Delete</button>
+        <button class="btn btn-primary" onclick="saveLeader()">Save Leader</button>
       </div>
     </div>
   </div>

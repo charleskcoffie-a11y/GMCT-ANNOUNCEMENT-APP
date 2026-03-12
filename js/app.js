@@ -382,6 +382,291 @@ function renderSocialActivities () {
   });
 }
 
+/* ── Hall of Fame / Leaders ──────────────────────── */
+function shouldDisplayLeaders () {
+  const settings = DB.getSettings();
+  if (!settings.hallOfFameEnabled) return false;
+  const leaders = DB.getLeaders();
+  if (!leaders.length) return false;
+  const minSocial = parseInt(settings.minSocialItemsShowLeaders, 10) || 2;
+  const socialCount = getUpcomingSocialActivities().length;
+  // Replace social panel with leaders only when social activities are below threshold
+  return socialCount < minSocial;
+}
+
+function parseLeaderYear (value) {
+  const y = parseInt(value, 10);
+  return Number.isFinite(y) ? y : null;
+}
+
+function getLeaderSortAnchorYear (leader) {
+  if (leader.status === 'current') return new Date().getFullYear() + 1;
+  return parseLeaderYear(leader.toYear) || parseLeaderYear(leader.fromYear) || 0;
+}
+
+function formatLeaderServiceYears (leader) {
+  const fromYear = parseLeaderYear(leader.fromYear);
+  const toYear = parseLeaderYear(leader.toYear);
+  if (leader.status === 'current') return fromYear ? `${fromYear} - Present` : 'Present';
+  if (fromYear && toYear) return `${fromYear} - ${toYear}`;
+  if (fromYear) return `${fromYear}`;
+  if (toYear) return `${toYear}`;
+  return 'Service years unavailable';
+}
+
+function leaderNeedsDisplayOrder (title) {
+  const lower = String(title || '').toLowerCase();
+  return lower.includes('minister') || lower.includes('bishop');
+}
+
+function parseLeaderDisplayOrder (value) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function getLeaderDisplayOrderForSort (leader) {
+  const n = parseLeaderDisplayOrder(leader.displayOrder);
+  return n === null ? Number.MAX_SAFE_INTEGER : n;
+}
+
+function compareOrderedLeadersWithinRole (a, b, roleA, roleB) {
+  const orderA = parseLeaderDisplayOrder(a.displayOrder);
+  const orderB = parseLeaderDisplayOrder(b.displayOrder);
+  const hasA = orderA !== null;
+  const hasB = orderB !== null;
+
+  if (!hasA && !hasB) return null;
+  if (hasA && hasB && orderA !== orderB) return orderA - orderB;
+  if (hasA && !hasB) return -1;
+  if (!hasA && hasB) return 1;
+
+  const nameDiff = (a.name || '').localeCompare(b.name || '');
+  if (nameDiff !== 0) return nameDiff;
+  return (a.id || '').localeCompare(b.id || '');
+}
+
+function getDisplayLeaders () {
+  return DB.getLeaders()
+    .filter(l => l && l.name && l.title)
+    .sort((a, b) => {
+      const roleA = getLeaderRoleKey(a.title);
+      const roleB = getLeaderRoleKey(b.title);
+
+      const orderedCompare = compareOrderedLeadersWithinRole(a, b, roleA, roleB);
+      if (orderedCompare !== null) return orderedCompare;
+
+      const anchorDiff = getLeaderSortAnchorYear(b) - getLeaderSortAnchorYear(a);
+      if (anchorDiff !== 0) return anchorDiff;
+
+      const fromDiff = (parseLeaderYear(b.fromYear) || 0) - (parseLeaderYear(a.fromYear) || 0);
+      if (fromDiff !== 0) return fromDiff;
+
+      return (a.name || '').localeCompare(b.name || '');
+    });
+}
+
+function getLeaderRoleLabel (title) {
+  const raw = String(title || '').trim();
+  if (!raw) return 'Other Leaders';
+
+  const lower = raw.toLowerCase();
+  if (lower.includes('minister')) return 'Ministers';
+  if (lower.includes('bishop')) return 'Bishops';
+  if (lower.includes('steward')) return 'Stewards';
+  if (lower.includes('pastor')) return 'Pastors';
+  if (lower.includes('elder')) return 'Elders';
+  return raw;
+}
+
+function getLeaderRoleKey (title) {
+  return getLeaderRoleLabel(title).toLowerCase();
+}
+
+function getLeaderDisplayOrderGroupKey (title) {
+  const lower = String(title || '').trim().toLowerCase();
+  if (!lower) return null;
+  if (lower.includes('minister')) return 'ministers';
+  if (lower.includes('bishop')) return 'bishops';
+  return null;
+}
+
+function getLeaderGroupPriority (roleKey) {
+  if (roleKey === 'ministers') return 0;
+  if (roleKey === 'bishops') return 1;
+  return 10;
+}
+
+function buildGroupedLeaderPages (leaders, leadersPerPage) {
+  const perPage = Math.max(1, leadersPerPage || 1);
+  const orderedLeaders = leaders.filter(leader => parseLeaderDisplayOrder(leader.displayOrder) !== null);
+  const unorderedLeaders = leaders.filter(leader => parseLeaderDisplayOrder(leader.displayOrder) === null);
+  const pages = [];
+
+  for (let index = 0; index < orderedLeaders.length; index += perPage) {
+    const pageItems = orderedLeaders.slice(index, index + perPage).map(leader => ({
+      leader,
+      groupLabel: getLeaderRoleLabel(leader.title),
+      orderInGroup: parseLeaderDisplayOrder(leader.displayOrder)
+    }));
+
+    if (pageItems.length < perPage && unorderedLeaders.length) {
+      const filler = unorderedLeaders.shift();
+      pageItems.push({
+        leader: filler,
+        groupLabel: getLeaderRoleLabel(filler.title),
+        orderInGroup: null
+      });
+    }
+
+    const labels = Array.from(new Set(pageItems.map(item => item.groupLabel)));
+    pages.push({
+      groupLabel: labels.length === 1 ? labels[0] : 'Hall of Fame Leaders',
+      items: pageItems
+    });
+  }
+
+  const groupsMap = new Map();
+
+  unorderedLeaders.forEach(leader => {
+    const key = getLeaderRoleKey(leader.title);
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, {
+        key,
+        label: getLeaderRoleLabel(leader.title),
+        leaders: []
+      });
+    }
+    groupsMap.get(key).leaders.push(leader);
+  });
+
+  const groups = Array.from(groupsMap.values()).sort((a, b) => {
+    const priorityDiff = getLeaderGroupPriority(a.key) - getLeaderGroupPriority(b.key);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const aAnchor = a.leaders[0] ? getLeaderSortAnchorYear(a.leaders[0]) : 0;
+    const bAnchor = b.leaders[0] ? getLeaderSortAnchorYear(b.leaders[0]) : 0;
+    if (aAnchor !== bAnchor) return bAnchor - aAnchor;
+    return a.label.localeCompare(b.label);
+  });
+
+  const normalizedGroups = groups.map(group => ({
+    ...group,
+    items: group.leaders.map((leader, index) => ({
+      leader,
+      groupLabel: group.label,
+      orderInGroup: index + 1
+    }))
+  }));
+
+  let groupIndex = 0;
+  let itemIndex = 0;
+  while (groupIndex < normalizedGroups.length) {
+    const pageItems = [];
+    while (pageItems.length < perPage && groupIndex < normalizedGroups.length) {
+      const currentGroup = normalizedGroups[groupIndex];
+      if (itemIndex < currentGroup.items.length) {
+        pageItems.push(currentGroup.items[itemIndex]);
+        itemIndex++;
+      }
+      if (itemIndex >= currentGroup.items.length) {
+        groupIndex++;
+        itemIndex = 0;
+      }
+    }
+
+    if (pageItems.length) {
+      const labels = Array.from(new Set(pageItems.map(item => item.groupLabel)));
+      pages.push({
+        groupLabel: labels.length === 1 ? labels[0] : 'Hall of Fame Leaders',
+        items: pageItems
+      });
+    }
+  }
+
+  return pages;
+}
+
+function renderLeaderCardHtml (entry) {
+  const leader = entry && entry.leader ? entry.leader : entry;
+  const photoHtml = leader.photoUrl
+    ? `<div class="leader-photo"><img src="${esc(leader.photoUrl)}" alt="${esc(leader.name)}" /></div>`
+    : '';
+  const bioHtml = leader.bio ? `<div class="leader-bio">${esc(leader.bio)}</div>` : '';
+  const yearsHtml = `<div class="leader-years">${esc(formatLeaderServiceYears(leader))}</div>`;
+  const statusBadge = leader.status === 'current'
+    ? '<span class="leader-status current">👑 Current</span>'
+    : '<span class="leader-status former">📜 Former</span>';
+
+  return `
+    <div class="leader-card">
+      ${photoHtml}
+      <div class="leader-info">
+        <div class="leader-name">${esc(leader.name)}</div>
+        <div class="leader-title">${esc(leader.title)}</div>
+        ${yearsHtml}
+        ${bioHtml}
+        ${statusBadge}
+      </div>
+    </div>`;
+}
+
+function getLeadersPerPage () {
+  return 2;
+}
+
+function renderLeaders () {
+  const list = getDisplayLeaders();
+  if (!list.length) {
+    const container = document.getElementById('social-or-leaders-list');
+    if (container) {
+      container.innerHTML = '<div class="no-content">No leaders in Hall of Fame yet</div>';
+    }
+    return;
+  }
+
+  const pages = buildGroupedLeaderPages(list, getLeadersPerPage());
+  
+  renderRollingCards({
+    containerId: 'social-or-leaders-list',
+    items: pages,
+    pageSize: 1,
+    emptyHtml: '<div class="no-content">No leaders to display</div>',
+    timerKey: 'leaders',
+    introPages: [],
+    renderCard: page => {
+      const pageItems = Array.isArray(page.items)
+        ? page.items
+        : (Array.isArray(page.leaders) ? page.leaders.map(leader => ({ leader })) : []);
+      const count = Math.max(1, Math.min(2, pageItems.length));
+      return `
+        <div class="leader-group-page">
+          <div class="leader-group-title">${esc(page.groupLabel)}</div>
+          <div class="leader-group-grid count-${count}">
+            ${pageItems.map(renderLeaderCardHtml).join('')}
+          </div>
+        </div>`;
+    }
+  });
+}
+
+function renderSecondPanel () {
+  // Determine which panel to show: social activities or hall of fame leaders
+  const showLeaders = shouldDisplayLeaders();
+  const wrapper = document.getElementById('second-panel-wrapper');
+  const panelHeader = document.getElementById('second-panel-title');
+  const panelIcon = document.getElementById('second-panel-icon');
+  
+  if (showLeaders) {
+    panelHeader.textContent = 'Hall of Fame - Leaders';
+    panelIcon.textContent = '👑';
+    renderLeaders();
+  } else {
+    panelHeader.textContent = 'Social Activities';
+    panelIcon.textContent = '🎉';
+    renderSocialActivities();
+  }
+}
+
 function clearRollingTimer (timerKey) {
   if (_rollTimers[timerKey]) {
     clearInterval(_rollTimers[timerKey]);
@@ -399,9 +684,10 @@ function clampInt (value, min, max, fallback) {
 function getSwitchIntervalMs (timerKey) {
   const s = DB.getSettings();
   const legacySwitch = clampInt(s.cardSwitchSeconds, 5, 60, DEFAULT_SWITCH_SECONDS);
-  const sec = timerKey === 'social'
-    ? clampInt(s.socialSwitchSeconds, 5, 60, legacySwitch)
-    : clampInt(s.programSwitchSeconds, 5, 60, legacySwitch);
+  let sec;
+  if (timerKey === 'social')   sec = clampInt(s.socialSwitchSeconds, 5, 60, legacySwitch);
+  else if (timerKey === 'leaders') sec = clampInt(s.leaderSwitchSeconds, 10, 60, 18);
+  else                          sec = clampInt(s.programSwitchSeconds, 5, 60, legacySwitch);
   return sec * 1000;
 }
 
@@ -409,13 +695,16 @@ const VALID_TRANSITIONS = ['fade', 'fly', 'zoom', 'flip', 'wipe', 'morph', 'glit
 
 function getTransitionStyle (timerKey) {
   const s = DB.getSettings();
-  const raw = timerKey === 'social' ? s.socialTransition : s.programTransition;
+  let raw;
+  if (timerKey === 'social')   raw = s.socialTransition;
+  else if (timerKey === 'leaders') raw = s.leaderTransition;
+  else                          raw = s.programTransition;
   return VALID_TRANSITIONS.includes(raw) ? raw : 'fade';
 }
 
 function applyAutoFitForCards (containerEl) {
   if (!containerEl) return;
-  const cards = containerEl.querySelectorAll('.prog-card, .evt-card');
+  const cards = containerEl.querySelectorAll('.prog-card, .evt-card, .leader-card');
   cards.forEach(card => {
     card.classList.remove('compact', 'dense');
     if (card.scrollHeight > card.clientHeight + 2) {
@@ -470,7 +759,7 @@ function triggerErrorRecovery () {
 function refreshDisplay () {
   applySettings();
   renderPrograms();
-  renderSocialActivities();
+  renderSecondPanel();
   renderTicker();
   scheduleDailyReload();
 }
@@ -567,8 +856,11 @@ function renderTicker () {
   if (active.length) {
     const msgs = active.map(a => `<span class="ticker-msg">${a.text}</span>`).join('<span class="ticker-sep">◆</span>');
     el.innerHTML = msgs + '<span class="ticker-sep">◆</span>';
+    el.style.animationName = 'ticker';
   } else {
-    el.innerHTML = `Welcome to ${FIXED_HEADER_TITLE}<span class="ticker-sep">◆</span>God bless you<span class="ticker-sep">◆</span>`;
+    el.innerHTML = '';
+    el.style.animationName = 'none';
+    return;
   }
 
   // Calculate duration based on speed setting
