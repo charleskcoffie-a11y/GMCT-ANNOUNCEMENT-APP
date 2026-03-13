@@ -146,8 +146,9 @@ const CloudSync = {
     const hasEvents = Array.isArray(payload.events);
     const hasFlyers = Array.isArray(payload.flyers);
     const hasAnnouncements = Array.isArray(payload.announcements);
+    const hasLeaders = Array.isArray(payload.leaders);
     const hasSettings = payload.settings && typeof payload.settings === 'object';
-    if (!hasPrograms && !hasEvents && !hasFlyers && !hasAnnouncements && !hasSettings) return;
+    if (!hasPrograms && !hasEvents && !hasFlyers && !hasAnnouncements && !hasLeaders && !hasSettings) return;
 
     this._suppressPush = true;
     try {
@@ -168,6 +169,7 @@ const CloudSync = {
         localStorage.setItem(KEYS.FLYERS, JSON.stringify(merged));
       }
       if (hasAnnouncements) localStorage.setItem(KEYS.ANNOUNCEMENTS, JSON.stringify(payload.announcements));
+      if (hasLeaders) localStorage.setItem(KEYS.LEADERS, JSON.stringify(payload.leaders));
       if (hasSettings) {
         // churchLogo handling:
         //  - If Firestore has a URL (Cloudinary), that is the source of truth.
@@ -249,6 +251,7 @@ const CloudSync = {
       events: DB.getEvents(),
       flyers: flyersForCloud,
       announcements: DB.getAnnouncements(),
+      leaders: DB.getLeaders(),
       settings: settingsForCloud
     };
 
