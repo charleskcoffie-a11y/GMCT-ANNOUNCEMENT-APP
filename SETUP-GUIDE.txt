@@ -1,0 +1,116 @@
+GMCT ANNOUNCEMENT APP - TV SETUP GUIDE
+=====================================
+Last updated: 2026-03-17
+
+1) REQUIRED LINKS
+-----------------
+Display URL:
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/
+
+Admin URL:
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html
+
+
+2) RECOMMENDED HARDWARE (LOW COST)
+----------------------------------
+Best budget option:
+- Chromecast with Google TV (4K)
+
+Alternative:
+- Google TV Streamer (4K)
+
+Notes:
+- Use wall power adapter for stability (do NOT power from TV USB).
+- Use stable Wi-Fi (or Ethernet if supported by device).
+
+
+3) FIRST-TIME TV DEVICE SETUP
+-----------------------------
+1. Connect device to TV HDMI.
+2. Power with included adapter.
+3. Complete Google account setup.
+4. Install a browser/kiosk app from Play Store.
+5. Set startup/home URL to:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/
+6. Enable app launch on boot (if kiosk app supports it).
+7. Disable sleep/screensaver/ambient mode.
+8. On Samsung TV, enable Anynet+ (HDMI-CEC).
+9. On TV, enable "Power on after power loss" if available.
+
+
+4) APP ADMIN SETUP CHECKLIST
+----------------------------
+1. Open Admin URL.
+2. Login (change password immediately if still default).
+3. Settings -> Cloudinary:
+   - Set Cloud Name
+   - Set Upload Preset (unsigned)
+4. Click "Save Settings".
+5. Optional: click "Sync Existing Local Images to Cloudinary".
+
+
+5) WEEKLY VIDEO ANNOUNCEMENT SETUP
+----------------------------------
+In Admin -> Settings -> Sunday Video Announcement:
+
+1. Enable Sunday schedule.
+2. Set Start Time (Sunday).
+3. Set End Time (Sunday).
+4. Optional: set Auto Remove After date/time.
+5. Upload video (recommended MP4, 720p, 1-2 minutes, <= 100MB).
+6. Confirm preview is visible.
+7. Click Save Settings.
+
+Behavior:
+- Video plays FULL SCREEN over both panels only during Sunday time window.
+- Outside the window, normal flyers/programs/social display continues.
+- If no scheduled video, only normal display is shown.
+
+
+6) WEEKLY OPERATIONS (STEWARD FLOW)
+-----------------------------------
+Every week:
+1. Open Admin URL.
+2. Upload this week's Sunday video.
+3. Update schedule times if needed.
+4. Set/remove Auto Remove After if needed.
+5. Save Settings.
+6. Verify on display screen before service.
+
+
+7) CREDIT USAGE TIPS (CLOUDINARY FREE TIER)
+--------------------------------------------
+- Keep only one active weekly video.
+- Keep video short and compressed.
+- Recommended: 720p, 1-2 minutes.
+- Avoid unnecessary re-uploads.
+- Monitor Cloudinary usage dashboard weekly.
+
+
+8) TROUBLESHOOTING QUICK CHECK
+------------------------------
+If TV shows old content:
+- Refresh display page.
+- Confirm internet is connected.
+- Verify Cloudinary URL exists in Settings.
+
+If Sunday video does not play:
+- Check Sunday schedule is enabled.
+- Check current day/time is within Start-End range.
+- Check video URL exists and preview works in Admin.
+- Check Auto Remove After is not in the past.
+
+If no auto-start after power outage:
+- Recheck kiosk app launch-on-boot settings.
+- Recheck TV power recovery setting.
+- Ensure device is using wall power adapter.
+
+
+9) SECURITY & ACCESS
+--------------------
+- Share admin access only with trusted stewards.
+- Change password periodically.
+- Keep one backup admin person available.
+
+
+END OF GUIDE

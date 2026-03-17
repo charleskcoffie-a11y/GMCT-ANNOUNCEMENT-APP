@@ -305,6 +305,101 @@
             </div>
           </div>
           <div id="cloudinary-status" style="margin:6px 0 0;font-size:.82rem;"></div>
+          <div style="margin-top:10px;">
+            <button type="button" id="cloudinary-sync-btn" class="btn btn-outline btn-sm" onclick="syncCloudinaryNow()">Sync Existing Local Images to Cloudinary</button>
+          </div>
+
+          <h3 style="margin-top:28px;">&#127909; Sunday Video Announcement</h3>
+          <p style="margin:0 0 12px;color:#555;font-size:.82rem;line-height:1.6;">
+            Upload one weekly announcement video to Cloudinary and schedule it for Sundays only.
+            During the configured Sunday time window, the video plays full-screen over the two-panel grid.
+            Outside the schedule, the regular flyers and programs display as usual.
+          </p>
+          <div class="form-grid two-col">
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="set-weekly-video-enabled" />
+                <span>Enable Sunday schedule</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label>Video Title (optional)</label>
+              <input type="text" id="set-weekly-video-title" class="form-input" placeholder="e.g. Weekly Steward Announcement" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label>Start Time (Sunday)</label>
+              <input type="time" id="set-weekly-video-start" class="form-input" value="09:00" />
+            </div>
+            <div class="form-group">
+              <label>End Time (Sunday)</label>
+              <input type="time" id="set-weekly-video-end" class="form-input" value="09:15" />
+            </div>
+            <div class="form-group full-width">
+              <label>Auto Remove After (optional)</label>
+              <input type="datetime-local" id="set-weekly-video-remove-after" class="form-input" />
+              <p style="margin:6px 0 0;color:#666;font-size:.78rem;line-height:1.45;">After this date/time, the video is no longer shown on display.</p>
+            </div>
+            <div class="form-group full-width">
+              <label>Upload Video (replaces current)</label>
+              <input type="file" id="set-weekly-video-file" class="form-input" accept="video/mp4,video/webm,video/quicktime" onchange="previewWeeklyVideoSelection(this.files)" />
+              <p style="margin:6px 0 0;color:#666;font-size:.78rem;line-height:1.45;">Recommended: MP4, 720p, 1-2 minutes, and 100MB or less.</p>
+              <button type="button" class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="removeWeeklyVideo()">Remove Scheduled Video</button>
+            </div>
+            <div class="form-group full-width hidden" id="weekly-video-preview-wrap">
+              <label>Preview</label>
+              <div class="flyer-admin-preview" style="max-width:420px;height:236px;">
+                <video id="weekly-video-preview" style="width:100%;height:100%;object-fit:contain;background:#000;" controls playsinline preload="metadata"></video>
+              </div>
+              <p id="weekly-video-preview-note" style="margin-top:6px;color:#666;font-size:.78rem;"></p>
+            </div>
+          </div>
+          <div id="weekly-video-status" style="margin:6px 0 0;font-size:.82rem;"></div>
+
+          <h3 style="margin-top:28px;">&#127912; Theme of the Year (Fullscreen)</h3>
+          <p style="margin:0 0 12px;color:#555;font-size:.82rem;line-height:1.6;">
+            Upload the yearly theme image and show it in full-screen over the main display content area.
+          </p>
+          <div class="form-grid two-col">
+            <div class="form-group full-width">
+              <label class="checkbox-label">
+                <input type="checkbox" id="set-theme-year-enabled" />
+                <span>Enable full-screen Theme of the Year</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label>Theme Show Time <span id="theme-year-show-seconds-val" style="color:#1a237e;font-weight:700;">12</span> sec</label>
+              <input type="range" id="set-theme-year-show-seconds" class="form-range" min="5" max="60" value="12" oninput="document.getElementById('theme-year-show-seconds-val').textContent=this.value" />
+              <p style="margin:4px 0 0;font-size:.78rem;color:#666;">How long the full-screen theme image stays visible each cycle.</p>
+            </div>
+            <div class="form-group">
+              <label>Grid Show Time <span id="theme-year-grid-seconds-val" style="color:#1a237e;font-weight:700;">30</span> sec</label>
+              <input type="range" id="set-theme-year-grid-seconds" class="form-range" min="5" max="180" value="30" oninput="document.getElementById('theme-year-grid-seconds-val').textContent=this.value" />
+              <p style="margin:4px 0 0;font-size:.78rem;color:#666;">How long Upcoming Programs + Social Activities stay visible before theme shows again.</p>
+            </div>
+            <div class="form-group full-width">
+              <label>Upload Theme Image</label>
+              <input type="file" id="set-theme-year-file" class="form-input" accept="image/png,image/jpeg,image/webp" onchange="previewThemeYearSelection(this.files)" />
+              <p style="margin:6px 0 0;color:#666;font-size:.78rem;line-height:1.45;">Recommended: JPG/PNG/WebP, landscape format, and 5MB or less.</p>
+              <button type="button" class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="removeThemeYearImage()">Remove Theme Image</button>
+            </div>
+            <div class="form-group full-width hidden" id="theme-year-preview-wrap">
+              <label>Preview</label>
+              <div class="flyer-admin-preview" style="max-width:420px;height:236px;">
+                <img id="theme-year-preview-img" alt="Theme of the year preview" style="width:100%;height:100%;object-fit:cover;background:#000;" />
+              </div>
+              <p id="theme-year-preview-note" style="margin-top:6px;color:#666;font-size:.78rem;"></p>
+            </div>
+          </div>
+          <div id="theme-year-status" style="margin:6px 0 0;font-size:.82rem;"></div>
+
+          <h3 style="margin-top:28px;">&#128196; TV Setup Guide</h3>
+          <p style="margin:0 0 12px;color:#555;font-size:.82rem;line-height:1.6;">
+            Open the plain-text setup guide for installing Google TV/Chromecast, kiosk startup, and weekly operation steps.
+          </p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <a class="btn btn-outline btn-sm" href="SETUP-GUIDE.txt" target="_blank" rel="noopener">Open Setup Guide (.txt)</a>
+            <a class="btn btn-outline btn-sm" href="SETUP-GUIDE.txt" download>Download Setup Guide (.txt)</a>
+          </div>
 
           <h3 style="margin-top:28px;">Backup and Restore</h3>
           <div class="form-grid">
@@ -623,7 +718,7 @@
             <input type="text" id="leader-title" class="form-input" placeholder="e.g., Senior Pastor" />
           </div>
           <div class="form-group">
-            <label>Display Order <span style="font-weight:400;color:#666;">(Ministers/Bishops)</span></label>
+            <label>Display Order <span style="font-weight:400;color:#666;">(optional; required for Ministers/Bishops)</span></label>
             <input type="number" id="leader-display-order" class="form-input" min="1" max="999" placeholder="e.g., 1" />
           </div>
           <div class="form-group">

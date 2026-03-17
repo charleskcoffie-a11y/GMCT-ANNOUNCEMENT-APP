@@ -22,6 +22,12 @@ let _dailyReloadTimer = null;
 let _storageSyncTimer = null;
 let _errorRecoveryArmed = false;
 let _reliabilityHandlersBound = false;
+let _weeklyVideoCurrentUrl = '';
+let _weeklyVideoVisible = false;
+let _themeYearCurrentSrc = '';
+let _themeYearVisible = false;
+let _themeYearRotationKey = '';
+let _themeYearRotationStartMs = 0;
 
 const WEEKDAY_INDEX = {
   Sunday: 0,
@@ -52,6 +58,8 @@ function updateClock () {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
   }
+
+  updateWeeklySundayVideoOverlay();
 }
 
 /* ── Apply settings to display ───────────────────── */
@@ -76,6 +84,211 @@ function applySettings () {
       cross.classList.remove('hidden');
     }
   }
+}
+
+function parseClockToMinutes (clockValue) {
+  if (typeof clockValue !== 'string' || !clockValue.includes(':')) return null;
+  const [hh, mm] = clockValue.split(':').map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return hh * 60 + mm;
+}
+
+function getThemeYearImageSource (settings) {
+  if (!settings) return '';
+  const url = String(settings.themeOfYearImageUrl || '').trim();
+  if (url) return url;
+  return String(settings.themeOfYearImageData || '').trim();
+}
+
+function shouldShowThemeYearOverlay (settings) {
+  if (!settings || settings.themeOfYearEnabled !== true) return false;
+  return !!getThemeYearImageSource(settings);
+}
+
+function getThemeYearRotationDurations (settings) {
+  const baseSwitch = clampInt(settings && settings.cardSwitchSeconds, 5, 60, DEFAULT_SWITCH_SECONDS);
+  const themeShowSeconds = clampInt(settings && settings.themeOfYearShowSeconds, 5, 60, 12);
+  const gridShowSeconds = clampInt(settings && settings.themeOfYearGridSeconds, 5, 180, 30);
+  return {
+    themeShowMs: themeShowSeconds * 1000,
+    gridShowMs: gridShowSeconds * 1000
+  };
+}
+
+function shouldDisplayThemeYearNow (settings, now = new Date()) {
+  if (!shouldShowThemeYearOverlay(settings)) {
+    _themeYearRotationKey = '';
+    _themeYearRotationStartMs = 0;
+    return false;
+  }
+
+  const src = getThemeYearImageSource(settings);
+  const key = `${settings.themeOfYearEnabled === true ? '1' : '0'}|${src}`;
+  const nowMs = now.getTime();
+  if (_themeYearRotationKey !== key) {
+    _themeYearRotationKey = key;
+    _themeYearRotationStartMs = nowMs;
+  }
+
+  const { themeShowMs, gridShowMs } = getThemeYearRotationDurations(settings);
+  const cycleMs = themeShowMs + gridShowMs;
+  if (cycleMs <= 0) return true;
+
+  const elapsedMs = (nowMs - _themeYearRotationStartMs) % cycleMs;
+  return elapsedMs < themeShowMs;
+}
+
+function hideThemeYearOverlay (resetSource = true) {
+  const overlay = document.getElementById('theme-year-overlay');
+  const image = document.getElementById('theme-year-image');
+  if (!overlay || !image) return;
+
+  if (!_themeYearVisible && !_themeYearCurrentSrc) return;
+
+  overlay.classList.add('hidden');
+  _themeYearVisible = false;
+
+  if (resetSource) {
+    _themeYearCurrentSrc = '';
+    image.removeAttribute('src');
+  }
+}
+
+function showThemeYearOverlay (settings) {
+  const overlay = document.getElementById('theme-year-overlay');
+  const image = document.getElementById('theme-year-image');
+  if (!overlay || !image) return;
+
+  const src = getThemeYearImageSource(settings);
+  if (!src) {
+    hideThemeYearOverlay();
+    return;
+  }
+
+  if (_themeYearCurrentSrc !== src) {
+    _themeYearCurrentSrc = src;
+    image.src = src;
+  }
+
+  overlay.classList.remove('hidden');
+  _themeYearVisible = true;
+}
+
+function shouldPlayWeeklySundayVideo (settings, now = new Date()) {
+  if (!settings || settings.weeklySundayVideoEnabled !== true) return false;
+
+  const url = String(settings.weeklySundayVideoUrl || '').trim();
+  if (!url) return false;
+
+  const removeAfterRaw = String(settings.weeklySundayVideoRemoveAfter || '').trim();
+  if (removeAfterRaw) {
+    const removeAfter = new Date(removeAfterRaw);
+    if (!Number.isNaN(removeAfter.getTime()) && now.getTime() >= removeAfter.getTime()) {
+      return false;
+    }
+  }
+
+  if (now.getDay() !== 0) return false; // Sunday only
+
+  const start = parseClockToMinutes(settings.weeklySundayVideoStartTime || '');
+  const end = parseClockToMinutes(settings.weeklySundayVideoEndTime || '');
+  if (start === null || end === null || end <= start) return false;
+
+  const current = now.getHours() * 60 + now.getMinutes();
+  return current >= start && current < end;
+}
+
+function hideWeeklySundayVideoOverlay () {
+  const overlay = document.getElementById('weekly-video-overlay');
+  const video = document.getElementById('weekly-video-player');
+  const titleEl = document.getElementById('weekly-video-title');
+  if (!overlay || !video) return;
+
+  if (!_weeklyVideoVisible && !_weeklyVideoCurrentUrl) return;
+
+  overlay.classList.add('hidden');
+  _weeklyVideoVisible = false;
+
+  video.pause();
+  if (_weeklyVideoCurrentUrl) {
+    video.removeAttribute('src');
+    video.load();
+    _weeklyVideoCurrentUrl = '';
+  }
+
+  if (titleEl) {
+    titleEl.textContent = '';
+    titleEl.classList.add('hidden');
+  }
+}
+
+function showWeeklySundayVideoOverlay (settings) {
+  const overlay = document.getElementById('weekly-video-overlay');
+  const video = document.getElementById('weekly-video-player');
+  const titleEl = document.getElementById('weekly-video-title');
+  if (!overlay || !video) return;
+
+  const videoUrl = String(settings.weeklySundayVideoUrl || '').trim();
+  if (!videoUrl) {
+    hideWeeklySundayVideoOverlay();
+    return;
+  }
+
+  if (_weeklyVideoCurrentUrl !== videoUrl) {
+    _weeklyVideoCurrentUrl = videoUrl;
+    video.src = videoUrl;
+    video.load();
+  }
+
+  const titleText = String(settings.weeklySundayVideoTitle || '').trim();
+  if (titleEl) {
+    if (titleText) {
+      titleEl.textContent = titleText;
+      titleEl.classList.remove('hidden');
+    } else {
+      titleEl.textContent = '';
+      titleEl.classList.add('hidden');
+    }
+  }
+
+  overlay.classList.remove('hidden');
+  _weeklyVideoVisible = true;
+
+  if (video.paused) {
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {
+        // Browsers may block autoplay with sound until user interaction.
+      });
+    }
+  }
+}
+
+function updateWeeklySundayVideoOverlay () {
+  const settings = DB.getSettings();
+  const now = new Date();
+
+  if (shouldPlayWeeklySundayVideo(settings, now)) {
+    hideThemeYearOverlay(false);
+    showWeeklySundayVideoOverlay(settings);
+    return true;
+  }
+
+  hideWeeklySundayVideoOverlay();
+
+  if (shouldDisplayThemeYearNow(settings, now)) {
+    showThemeYearOverlay(settings);
+    return true;
+  }
+
+  if (shouldShowThemeYearOverlay(settings)) {
+    hideThemeYearOverlay(false);
+    return false;
+  }
+
+  hideThemeYearOverlay();
+  return false;
 }
 
 function toIsoDate (dateObj) {
@@ -761,6 +974,7 @@ function refreshDisplay () {
   renderPrograms();
   renderSecondPanel();
   renderTicker();
+  updateWeeklySundayVideoOverlay();
   scheduleDailyReload();
 }
 

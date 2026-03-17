@@ -28,7 +28,18 @@ const DEFAULT_SETTINGS = {
   socialTransition: 'fade',
   leaderTransition: 'fade',
   hallOfFameEnabled: true,
-  minSocialItemsShowLeaders: 2
+  minSocialItemsShowLeaders: 2,
+  weeklySundayVideoEnabled: false,
+  weeklySundayVideoUrl: '',
+  weeklySundayVideoStartTime: '09:00',
+  weeklySundayVideoEndTime: '09:15',
+  weeklySundayVideoTitle: '',
+  weeklySundayVideoRemoveAfter: '',
+  themeOfYearEnabled: false,
+  themeOfYearShowSeconds: 12,
+  themeOfYearGridSeconds: 30,
+  themeOfYearImageUrl: '',
+  themeOfYearImageData: ''
 };
 
 const CLOUD_SYNC_KEYS = [
@@ -171,13 +182,17 @@ const CloudSync = {
       if (hasAnnouncements) localStorage.setItem(KEYS.ANNOUNCEMENTS, JSON.stringify(payload.announcements));
       if (hasLeaders) localStorage.setItem(KEYS.LEADERS, JSON.stringify(payload.leaders));
       if (hasSettings) {
-        // churchLogo handling:
+        // churchLogo/themeOfYear handling:
         //  - If Firestore has a URL (Cloudinary), that is the source of truth.
-        //  - If Firestore has no logo, preserve the local copy (Base64 or URL).
+        //  - If Firestore has no URL/data, preserve local Base64 fallback.
         const localSettings = DB._get(KEYS.SETTINGS);
         const localLogo = localSettings && localSettings.churchLogo ? localSettings.churchLogo : null;
+        const localThemeData = localSettings && localSettings.themeOfYearImageData ? localSettings.themeOfYearImageData : '';
         const merged = Object.assign({}, DEFAULT_SETTINGS, payload.settings);
         if (!merged.churchLogo && localLogo) merged.churchLogo = localLogo;
+        if (!merged.themeOfYearImageUrl && !merged.themeOfYearImageData && localThemeData) {
+          merged.themeOfYearImageData = localThemeData;
+        }
         localStorage.setItem(KEYS.SETTINGS, JSON.stringify(merged));
       }
     } finally {
@@ -234,6 +249,10 @@ const CloudSync = {
     const settingsForCloud = Object.assign({}, DB.getSettings());
     if (settingsForCloud.churchLogo && settingsForCloud.churchLogo.startsWith('data:')) {
       delete settingsForCloud.churchLogo;
+    }
+    // Theme of year image can be large; keep URL only in Firestore.
+    if (settingsForCloud.themeOfYearImageData && settingsForCloud.themeOfYearImageData.startsWith('data:')) {
+      delete settingsForCloud.themeOfYearImageData;
     }
 
     // Strip imageData from flyers — binary blobs would exceed Firestore's 1 MB

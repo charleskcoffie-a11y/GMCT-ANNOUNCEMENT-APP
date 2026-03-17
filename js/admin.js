@@ -27,6 +27,12 @@ let _cloudUiRefreshTimer = null;
 /* ── Logo upload state ─────────────────────── */
 let _pendingLogoFile = null;
 let _removeLogo = false;
+let _pendingWeeklyVideoFile = null;
+let _removeWeeklyVideo = false;
+let _weeklyVideoPreviewObjectUrl = null;
+let _pendingThemeYearFile = null;
+let _removeThemeYear = false;
+let _themeYearPreviewObjectUrl = null;
 
 function getAuthMeta () {
   try {
@@ -782,6 +788,10 @@ let _flyerPreviewObjectUrl = null;
 
 const FLYER_MAX_FILE_BYTES = 3 * 1024 * 1024;
 const FLYER_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const WEEKLY_VIDEO_MAX_FILE_BYTES = 100 * 1024 * 1024;
+const WEEKLY_VIDEO_ALLOWED_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+const THEME_YEAR_MAX_FILE_BYTES = 5 * 1024 * 1024;
+const THEME_YEAR_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function getFlyerPanelLabel (side) {
   return side === 'social' ? 'Social Activities' : 'Upcoming Programs';
@@ -903,7 +913,7 @@ function editFlyer (id) {
   document.getElementById('flyer-active').checked = flyer.active !== false;
   document.getElementById('flyer-image-file').value = '';
 
-  setFlyerPreviewImage(flyer.imageData || '');
+  setFlyerPreviewImage(flyer.imageUrl || flyer.imageData || '');
   document.getElementById('flyer-modal').classList.remove('hidden');
 }
 
@@ -956,12 +966,13 @@ function encodeImageAsBase64 (file) {
   });
 }
 
-async function uploadToCloudinary (file, cloudName, preset) {
+async function uploadToCloudinary (file, cloudName, preset, resourceType = 'image') {
+  const safeType = resourceType === 'video' ? 'video' : 'image';
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', preset);
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${safeType}/upload`,
     { method: 'POST', body: formData }
   );
   if (!res.ok) {
@@ -970,6 +981,121 @@ async function uploadToCloudinary (file, cloudName, preset) {
   }
   const data = await res.json();
   return data.secure_url;
+}
+
+function getCloudinaryConfigFromSettings (settings) {
+  const cloudName = String(settings && settings.cloudinaryCloud ? settings.cloudinaryCloud : '').trim();
+  const preset = String(settings && settings.cloudinaryPreset ? settings.cloudinaryPreset : '').trim();
+  return {
+    cloudName,
+    preset,
+    configured: !!(cloudName && preset)
+  };
+}
+
+function hasCloudinaryConfig (settings) {
+  return getCloudinaryConfigFromSettings(settings).configured;
+}
+
+function isSupportedWeeklyVideoFile (file) {
+  if (!file) return false;
+  if (WEEKLY_VIDEO_ALLOWED_MIME_TYPES.includes(file.type)) return true;
+  const name = String(file.name || '').toLowerCase();
+  return name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov');
+}
+
+function isSupportedThemeYearImageFile (file) {
+  if (!file) return false;
+  if (THEME_YEAR_ALLOWED_MIME_TYPES.includes(file.type)) return true;
+  const name = String(file.name || '').toLowerCase();
+  return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp');
+}
+
+function isValidClockTime (value) {
+  return typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function isImageDataUrl (value) {
+  return typeof value === 'string' && /^data:image\//i.test(value);
+}
+
+function mimeTypeToFileExt (mimeType) {
+  const map = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/x-icon': 'ico'
+  };
+  return map[mimeType] || 'png';
+}
+
+async function dataUrlToFile (dataUrl, fileNameBase = 'gmct-image') {
+  const res = await fetch(dataUrl);
+  if (!res.ok) throw new Error('Invalid image data');
+  const blob = await res.blob();
+  const mimeType = blob.type || 'image/png';
+  const ext = mimeTypeToFileExt(mimeType);
+  return new File([blob], `${fileNameBase}.${ext}`, { type: mimeType });
+}
+
+async function uploadDataUrlToCloudinary (dataUrl, cloudName, preset, fileNameBase) {
+  const file = await dataUrlToFile(dataUrl, fileNameBase);
+  return uploadToCloudinary(file, cloudName, preset, 'image');
+}
+
+async function syncLocalImagesToCloudinary (settings) {
+  const cfg = getCloudinaryConfigFromSettings(settings);
+  if (!cfg.configured) return { synced: 0, failed: 0 };
+
+  const flyers = DB.getFlyers().map(f => Object.assign({}, f));
+  let flyersChanged = false;
+  let synced = 0;
+  let failed = 0;
+
+  for (let i = 0; i < flyers.length; i++) {
+    const flyer = flyers[i];
+    if (!flyer || flyer.imageUrl || !isImageDataUrl(flyer.imageData)) continue;
+
+    try {
+      const baseName = flyer.id ? `gmct-flyer-${flyer.id}` : `gmct-flyer-${Date.now()}-${i}`;
+      flyer.imageUrl = await uploadDataUrlToCloudinary(flyer.imageData, cfg.cloudName, cfg.preset, baseName);
+      flyer.imageData = '';
+      flyer.updatedAtMs = Date.now();
+      flyersChanged = true;
+      synced++;
+    } catch (err) {
+      failed++;
+      console.error('Flyer Cloudinary sync failed', err);
+    }
+  }
+
+  if (flyersChanged) DB.saveFlyers(flyers);
+
+  if (isImageDataUrl(settings.churchLogo)) {
+    try {
+      settings.churchLogo = await uploadDataUrlToCloudinary(settings.churchLogo, cfg.cloudName, cfg.preset, 'gmct-church-logo');
+      synced++;
+    } catch (err) {
+      failed++;
+      console.error('Church logo Cloudinary sync failed', err);
+    }
+  }
+
+  if (!settings.themeOfYearImageUrl && isImageDataUrl(settings.themeOfYearImageData)) {
+    try {
+      settings.themeOfYearImageUrl = await uploadDataUrlToCloudinary(settings.themeOfYearImageData, cfg.cloudName, cfg.preset, 'gmct-theme-of-year');
+      settings.themeOfYearImageData = '';
+      synced++;
+    } catch (err) {
+      failed++;
+      console.error('Theme image Cloudinary sync failed', err);
+    }
+  }
+
+  return { synced, failed };
 }
 
 async function saveFlyer () {
@@ -1001,14 +1127,15 @@ async function saveFlyer () {
 
   let imageData = existing ? (existing.imageData || '') : '';
   let imageUrl  = existing ? (existing.imageUrl  || '') : '';
+  const settings = DB.getSettings();
+  const cloudCfg = getCloudinaryConfigFromSettings(settings);
 
   if (_flyerSelectedFile) {
-    const s = DB.getSettings();
-    if (s.cloudinaryCloud && s.cloudinaryPreset) {
+    if (cloudCfg.configured) {
       // Upload to Cloudinary — returns a permanent URL
       toast('Uploading image to Cloudinary…', 'info');
       try {
-        imageUrl  = await uploadToCloudinary(_flyerSelectedFile, s.cloudinaryCloud, s.cloudinaryPreset);
+        imageUrl  = await uploadToCloudinary(_flyerSelectedFile, cloudCfg.cloudName, cloudCfg.preset);
         imageData = ''; // clear any old local Base64 blob
       } catch (err) {
         console.error('Cloudinary upload failed', err);
@@ -1025,6 +1152,17 @@ async function saveFlyer () {
         toast('Could not encode image. Try selecting a different file.', 'error');
         return;
       }
+    }
+  } else if (cloudCfg.configured && !imageUrl && isImageDataUrl(imageData)) {
+    toast('Syncing existing flyer image to Cloudinary…', 'info');
+    try {
+      const baseName = existing && existing.id ? `gmct-flyer-${existing.id}` : `gmct-flyer-${Date.now()}`;
+      imageUrl = await uploadDataUrlToCloudinary(imageData, cloudCfg.cloudName, cloudCfg.preset, baseName);
+      imageData = '';
+    } catch (err) {
+      console.error('Cloudinary migration failed', err);
+      toast('Cloudinary upload failed: ' + err.message, 'error');
+      return;
     }
   }
 
@@ -1287,7 +1425,7 @@ function loadLeadersTable () {
     <tr>
       <td>${esc(l.name || '')}</td>
       <td>${esc(l.title || '')}</td>
-      <td>${leaderNeedsDisplayOrder(l.title) ? esc(String(parseLeaderDisplayOrder(l.displayOrder) || '—')) : '—'}</td>
+      <td>${esc(String(parseLeaderDisplayOrder(l.displayOrder) || '—'))}</td>
       <td>${esc(getLeaderServiceYearsLabel(l))}</td>
       <td>
         <button class="btn btn-sm ${l.status === 'current' ? 'btn-primary' : 'btn-outline'}"
@@ -1368,18 +1506,24 @@ async function saveLeader () {
   const name = document.getElementById('leader-name').value.trim();
   const title = document.getElementById('leader-title').value.trim();
   const displayOrderRaw = document.getElementById('leader-display-order').value.trim();
+  const hasDisplayOrderInput = displayOrderRaw.length > 0;
   const status = document.getElementById('leader-status').value;
   const fromYearRaw = document.getElementById('leader-from-year').value.trim();
   const toYearRaw = document.getElementById('leader-to-year').value.trim();
   const bio = document.getElementById('leader-bio').value.trim();
   const needsOrder = leaderNeedsDisplayOrder(title);
   const displayOrder = parseLeaderDisplayOrder(displayOrderRaw);
+  const normalizedDisplayOrder = displayOrder || null;
   const maxYear = getLeaderCurrentYear() + 1;
   const fromYear = parseLeaderYear(fromYearRaw);
   const toYear = parseLeaderYear(toYearRaw);
 
   if (!name || !title) {
     toast('Please fill in Name and Title', 'error');
+    return;
+  }
+  if (hasDisplayOrderInput && !displayOrder) {
+    toast('Display Order must be a number greater than 0', 'error');
     return;
   }
   if (needsOrder && !displayOrder) {
@@ -1427,7 +1571,7 @@ async function saveLeader () {
     const nextLeader = {
       ...list[idx],
       name, title, status, fromYear,
-      displayOrder: needsOrder ? displayOrder : null,
+      displayOrder: normalizedDisplayOrder,
       toYear: status === 'former' ? toYear : null,
       bio
     };
@@ -1438,7 +1582,7 @@ async function saveLeader () {
     list.push({
       id: 'leader-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
       name, title, status,
-      displayOrder: needsOrder ? displayOrder : null,
+      displayOrder: normalizedDisplayOrder,
       fromYear,
       toYear: status === 'former' ? toYear : null,
       bio,
@@ -1533,6 +1677,30 @@ function sanitizeDailyReloadTime (value) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
+function sanitizeClockTime (value, fallback = '09:00') {
+  return isValidClockTime(value) ? value : fallback;
+}
+
+function toDateTimeLocalValueFromIso (isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return '';
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${mins}`;
+}
+
+function toIsoFromDateTimeLocalValue (value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString();
+}
+
 const VALID_TRANSITIONS = ['fade', 'fly', 'zoom', 'flip', 'wipe', 'morph', 'glitch'];
 
 /* ── Logo helpers ─────────────────────────── */
@@ -1560,6 +1728,153 @@ function removeLogo () {
   if (img) { img.src = ''; img.style.display = 'none'; }
   if (ph)  { ph.style.display = ''; }
   if (inp) { inp.value = ''; }
+}
+
+function releaseWeeklyVideoPreviewObjectUrl () {
+  if (_weeklyVideoPreviewObjectUrl) {
+    URL.revokeObjectURL(_weeklyVideoPreviewObjectUrl);
+    _weeklyVideoPreviewObjectUrl = null;
+  }
+}
+
+function setWeeklyVideoPreviewSource (src, note = '') {
+  const wrap = document.getElementById('weekly-video-preview-wrap');
+  const video = document.getElementById('weekly-video-preview');
+  const noteEl = document.getElementById('weekly-video-preview-note');
+  if (!wrap || !video) return;
+
+  if (!src) {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    wrap.classList.add('hidden');
+    if (noteEl) noteEl.textContent = '';
+    return;
+  }
+
+  video.src = src;
+  video.currentTime = 0;
+  video.load();
+  wrap.classList.remove('hidden');
+  if (noteEl) noteEl.textContent = note || '';
+}
+
+function previewWeeklyVideoSelection (files) {
+  const input = document.getElementById('set-weekly-video-file');
+  const file = files && files[0];
+
+  if (!file) {
+    _pendingWeeklyVideoFile = null;
+    releaseWeeklyVideoPreviewObjectUrl();
+    const existingUrl = DB.getSettings().weeklySundayVideoUrl || '';
+    setWeeklyVideoPreviewSource(existingUrl, existingUrl ? 'Current scheduled video' : '');
+    return;
+  }
+
+  if (!isSupportedWeeklyVideoFile(file)) {
+    toast('Please choose a valid video file: MP4, WebM, or MOV', 'error');
+    if (input) input.value = '';
+    _pendingWeeklyVideoFile = null;
+    return;
+  }
+
+  if (file.size > WEEKLY_VIDEO_MAX_FILE_BYTES) {
+    toast('Video must be 100MB or less', 'error');
+    if (input) input.value = '';
+    _pendingWeeklyVideoFile = null;
+    return;
+  }
+
+  _removeWeeklyVideo = false;
+  _pendingWeeklyVideoFile = file;
+
+  releaseWeeklyVideoPreviewObjectUrl();
+  _weeklyVideoPreviewObjectUrl = URL.createObjectURL(file);
+  setWeeklyVideoPreviewSource(_weeklyVideoPreviewObjectUrl, `Selected file: ${file.name}`);
+}
+
+function removeWeeklyVideo () {
+  _removeWeeklyVideo = true;
+  _pendingWeeklyVideoFile = null;
+
+  const input = document.getElementById('set-weekly-video-file');
+  if (input) input.value = '';
+
+  releaseWeeklyVideoPreviewObjectUrl();
+  setWeeklyVideoPreviewSource('', '');
+  toast('Scheduled video will be removed when you save settings', 'info');
+}
+
+function releaseThemeYearPreviewObjectUrl () {
+  if (_themeYearPreviewObjectUrl) {
+    URL.revokeObjectURL(_themeYearPreviewObjectUrl);
+    _themeYearPreviewObjectUrl = null;
+  }
+}
+
+function setThemeYearPreviewSource (src, note = '') {
+  const wrap = document.getElementById('theme-year-preview-wrap');
+  const img = document.getElementById('theme-year-preview-img');
+  const noteEl = document.getElementById('theme-year-preview-note');
+  if (!wrap || !img) return;
+
+  if (!src) {
+    img.removeAttribute('src');
+    wrap.classList.add('hidden');
+    if (noteEl) noteEl.textContent = '';
+    return;
+  }
+
+  img.src = src;
+  wrap.classList.remove('hidden');
+  if (noteEl) noteEl.textContent = note || '';
+}
+
+function previewThemeYearSelection (files) {
+  const input = document.getElementById('set-theme-year-file');
+  const file = files && files[0];
+
+  if (!file) {
+    _pendingThemeYearFile = null;
+    releaseThemeYearPreviewObjectUrl();
+    const settings = DB.getSettings();
+    const existingSrc = (settings.themeOfYearImageUrl || settings.themeOfYearImageData || '').trim();
+    setThemeYearPreviewSource(existingSrc, existingSrc ? 'Current theme image' : '');
+    return;
+  }
+
+  if (!isSupportedThemeYearImageFile(file)) {
+    toast('Please choose a valid image file: JPG, PNG, or WebP', 'error');
+    if (input) input.value = '';
+    _pendingThemeYearFile = null;
+    return;
+  }
+
+  if (file.size > THEME_YEAR_MAX_FILE_BYTES) {
+    toast('Theme image must be 5MB or less', 'error');
+    if (input) input.value = '';
+    _pendingThemeYearFile = null;
+    return;
+  }
+
+  _removeThemeYear = false;
+  _pendingThemeYearFile = file;
+
+  releaseThemeYearPreviewObjectUrl();
+  _themeYearPreviewObjectUrl = URL.createObjectURL(file);
+  setThemeYearPreviewSource(_themeYearPreviewObjectUrl, `Selected file: ${file.name}`);
+}
+
+function removeThemeYearImage () {
+  _removeThemeYear = true;
+  _pendingThemeYearFile = null;
+
+  const input = document.getElementById('set-theme-year-file');
+  if (input) input.value = '';
+
+  releaseThemeYearPreviewObjectUrl();
+  setThemeYearPreviewSource('', '');
+  toast('Theme image will be removed when you save settings', 'info');
 }
 
 function pickTransition (pickerId, hiddenId, btn) {
@@ -1643,6 +1958,79 @@ function loadSettingsForm () {
     }
   }
 
+  const weeklyEnabledEl = document.getElementById('set-weekly-video-enabled');
+  const weeklyTitleEl = document.getElementById('set-weekly-video-title');
+  const weeklyStartEl = document.getElementById('set-weekly-video-start');
+  const weeklyEndEl = document.getElementById('set-weekly-video-end');
+  const weeklyRemoveAfterEl = document.getElementById('set-weekly-video-remove-after');
+  const weeklyStatusEl = document.getElementById('weekly-video-status');
+  const weeklyFileInput = document.getElementById('set-weekly-video-file');
+
+  const weeklyVideoUrl = String(s.weeklySundayVideoUrl || '').trim();
+  const weeklyStart = sanitizeClockTime(s.weeklySundayVideoStartTime, '09:00');
+  const weeklyEnd = sanitizeClockTime(s.weeklySundayVideoEndTime, '09:15');
+  const weeklyRemoveAfter = toDateTimeLocalValueFromIso(s.weeklySundayVideoRemoveAfter || '');
+
+  if (weeklyEnabledEl) weeklyEnabledEl.checked = s.weeklySundayVideoEnabled === true;
+  if (weeklyTitleEl) weeklyTitleEl.value = s.weeklySundayVideoTitle || '';
+  if (weeklyStartEl) weeklyStartEl.value = weeklyStart;
+  if (weeklyEndEl) weeklyEndEl.value = weeklyEnd;
+  if (weeklyRemoveAfterEl) weeklyRemoveAfterEl.value = weeklyRemoveAfter;
+
+  _pendingWeeklyVideoFile = null;
+  _removeWeeklyVideo = false;
+  releaseWeeklyVideoPreviewObjectUrl();
+  if (weeklyFileInput) weeklyFileInput.value = '';
+
+  if (weeklyStatusEl) {
+    const scheduleText = `Sunday ${weeklyStart} - ${weeklyEnd}`;
+    const removeText = weeklyRemoveAfter ? ` Auto remove: ${weeklyRemoveAfter.replace('T', ' ')}` : '';
+    if (weeklyVideoUrl && s.weeklySundayVideoEnabled) {
+      weeklyStatusEl.innerHTML = `<span style="color:#2e7d32;">&#10003; Scheduled video active (${scheduleText}).${removeText}</span>`;
+    } else if (weeklyVideoUrl) {
+      weeklyStatusEl.innerHTML = `<span style="color:#6a1b9a;">Video uploaded but schedule is disabled (${scheduleText}).${removeText}</span>`;
+    } else {
+      weeklyStatusEl.innerHTML = '<span style="color:#888;">No Sunday video uploaded yet.</span>';
+    }
+  }
+
+  setWeeklyVideoPreviewSource(weeklyVideoUrl, weeklyVideoUrl ? 'Current scheduled video' : '');
+
+  const themeEnabledEl = document.getElementById('set-theme-year-enabled');
+  const themeShowEl = document.getElementById('set-theme-year-show-seconds');
+  const themeShowValEl = document.getElementById('theme-year-show-seconds-val');
+  const themeGridEl = document.getElementById('set-theme-year-grid-seconds');
+  const themeGridValEl = document.getElementById('theme-year-grid-seconds-val');
+  const themeFileInput = document.getElementById('set-theme-year-file');
+  const themeStatusEl = document.getElementById('theme-year-status');
+  const themeSrc = String(s.themeOfYearImageUrl || s.themeOfYearImageData || '').trim();
+  const themeShowSeconds = clampInt(s.themeOfYearShowSeconds, 5, 60, 12);
+  const themeGridSeconds = clampInt(s.themeOfYearGridSeconds, 5, 180, 30);
+
+  if (themeEnabledEl) themeEnabledEl.checked = s.themeOfYearEnabled === true;
+  if (themeShowEl) themeShowEl.value = themeShowSeconds;
+  if (themeShowValEl) themeShowValEl.textContent = themeShowSeconds;
+  if (themeGridEl) themeGridEl.value = themeGridSeconds;
+  if (themeGridValEl) themeGridValEl.textContent = themeGridSeconds;
+
+  _pendingThemeYearFile = null;
+  _removeThemeYear = false;
+  releaseThemeYearPreviewObjectUrl();
+  if (themeFileInput) themeFileInput.value = '';
+
+  if (themeStatusEl) {
+    const rotationText = `Rotation: Theme ${themeShowSeconds}s / Grid ${themeGridSeconds}s.`;
+    if (themeSrc && s.themeOfYearEnabled) {
+      themeStatusEl.innerHTML = `<span style="color:#2e7d32;">&#10003; Full-screen theme image is active. ${rotationText}</span>`;
+    } else if (themeSrc) {
+      themeStatusEl.innerHTML = `<span style="color:#6a1b9a;">Theme image uploaded, but fullscreen theme mode is disabled. ${rotationText}</span>`;
+    } else {
+      themeStatusEl.innerHTML = `<span style="color:#888;">No theme image uploaded yet. ${rotationText}</span>`;
+    }
+  }
+
+  setThemeYearPreviewSource(themeSrc, themeSrc ? 'Current theme image' : '');
+
   const backupInput = document.getElementById('backup-file');
   if (backupInput) backupInput.value = '';
 }
@@ -1679,6 +2067,120 @@ async function saveSettings () {
   s.cloudinaryCloud  = cloudVal.trim();
   s.cloudinaryPreset = presetVal.trim();
 
+  // Theme of the Year fullscreen image
+  s.themeOfYearEnabled = document.getElementById('set-theme-year-enabled').checked;
+  s.themeOfYearShowSeconds = clampInt((document.getElementById('set-theme-year-show-seconds') || {}).value, 5, 60, 12);
+  s.themeOfYearGridSeconds = clampInt((document.getElementById('set-theme-year-grid-seconds') || {}).value, 5, 180, 30);
+
+  const themeImageFile = _pendingThemeYearFile;
+  if (themeImageFile) {
+    if (!isSupportedThemeYearImageFile(themeImageFile)) {
+      toast('Please choose a valid image file: JPG, PNG, or WebP', 'error');
+      return;
+    }
+    if (themeImageFile.size > THEME_YEAR_MAX_FILE_BYTES) {
+      toast('Theme image must be 5MB or less', 'error');
+      return;
+    }
+
+    try {
+      if (s.cloudinaryCloud && s.cloudinaryPreset) {
+        toast('Uploading theme image to Cloudinary…', 'info');
+        s.themeOfYearImageUrl = await uploadToCloudinary(themeImageFile, s.cloudinaryCloud, s.cloudinaryPreset, 'image');
+        s.themeOfYearImageData = '';
+      } else {
+        s.themeOfYearImageData = await encodeImageAsBase64(themeImageFile);
+        s.themeOfYearImageUrl = '';
+      }
+      _pendingThemeYearFile = null;
+      _removeThemeYear = false;
+    } catch (err) {
+      console.error('Theme image save failed', err);
+      toast('Theme image upload failed: ' + err.message, 'error');
+      return;
+    }
+  } else if (_removeThemeYear) {
+    s.themeOfYearImageUrl = '';
+    s.themeOfYearImageData = '';
+    _removeThemeYear = false;
+  }
+
+  if (s.themeOfYearEnabled && !String(s.themeOfYearImageUrl || s.themeOfYearImageData || '').trim()) {
+    toast('Upload a theme image or disable fullscreen theme mode before saving', 'error');
+    return;
+  }
+
+  // Sunday weekly video schedule
+  const weeklyEnabled = document.getElementById('set-weekly-video-enabled').checked;
+  const weeklyTitle = (document.getElementById('set-weekly-video-title').value || '').trim();
+  const weeklyStartRaw = (document.getElementById('set-weekly-video-start').value || '').trim();
+  const weeklyEndRaw = (document.getElementById('set-weekly-video-end').value || '').trim();
+  const weeklyRemoveAfterRaw = (document.getElementById('set-weekly-video-remove-after').value || '').trim();
+
+  if (!isValidClockTime(weeklyStartRaw) || !isValidClockTime(weeklyEndRaw)) {
+    toast('Set a valid Sunday video start and end time', 'error');
+    return;
+  }
+
+  const weeklyStartMinutes = parseTimeToMinutes(weeklyStartRaw);
+  const weeklyEndMinutes = parseTimeToMinutes(weeklyEndRaw);
+  if (weeklyStartMinutes === null || weeklyEndMinutes === null || weeklyEndMinutes <= weeklyStartMinutes) {
+    toast('Sunday video end time must be later than start time', 'error');
+    return;
+  }
+
+  s.weeklySundayVideoEnabled = weeklyEnabled;
+  s.weeklySundayVideoTitle = weeklyTitle;
+  s.weeklySundayVideoStartTime = weeklyStartRaw;
+  s.weeklySundayVideoEndTime = weeklyEndRaw;
+
+  if (weeklyRemoveAfterRaw) {
+    const removeAfterIso = toIsoFromDateTimeLocalValue(weeklyRemoveAfterRaw);
+    if (!removeAfterIso) {
+      toast('Set a valid Auto Remove After date/time', 'error');
+      return;
+    }
+    s.weeklySundayVideoRemoveAfter = removeAfterIso;
+  } else {
+    s.weeklySundayVideoRemoveAfter = '';
+  }
+
+  const weeklyVideoFile = _pendingWeeklyVideoFile;
+  if (weeklyVideoFile) {
+    if (!isSupportedWeeklyVideoFile(weeklyVideoFile)) {
+      toast('Please choose a valid video file: MP4, WebM, or MOV', 'error');
+      return;
+    }
+    if (weeklyVideoFile.size > WEEKLY_VIDEO_MAX_FILE_BYTES) {
+      toast('Sunday video must be 100MB or less', 'error');
+      return;
+    }
+
+    if (!(s.cloudinaryCloud && s.cloudinaryPreset)) {
+      toast('Configure Cloudinary before uploading Sunday video', 'error');
+      return;
+    }
+
+    try {
+      toast('Uploading Sunday video to Cloudinary…', 'info');
+      s.weeklySundayVideoUrl = await uploadToCloudinary(weeklyVideoFile, s.cloudinaryCloud, s.cloudinaryPreset, 'video');
+      _pendingWeeklyVideoFile = null;
+      _removeWeeklyVideo = false;
+    } catch (err) {
+      console.error('Sunday video upload failed', err);
+      toast('Sunday video upload failed: ' + err.message, 'error');
+      return;
+    }
+  } else if (_removeWeeklyVideo) {
+    s.weeklySundayVideoUrl = '';
+    _removeWeeklyVideo = false;
+  }
+
+  if (s.weeklySundayVideoEnabled && !String(s.weeklySundayVideoUrl || '').trim()) {
+    toast('Upload a Sunday video or disable the Sunday schedule before saving', 'error');
+    return;
+  }
+
   // Save logo if a new one was selected
   const logoFile = _pendingLogoFile;
   if (logoFile) {
@@ -1700,10 +2202,81 @@ async function saveSettings () {
     _removeLogo = false;
   }
 
+  let cloudSyncSummary = { synced: 0, failed: 0 };
+  if (hasCloudinaryConfig(s)) {
+    const pendingFlyers = DB.getFlyers().some(f => !f.imageUrl && isImageDataUrl(f.imageData));
+    const pendingLogo = isImageDataUrl(s.churchLogo);
+    const pendingTheme = !s.themeOfYearImageUrl && isImageDataUrl(s.themeOfYearImageData);
+    if (pendingFlyers || pendingLogo || pendingTheme) {
+      toast('Syncing local images to Cloudinary…', 'info');
+      cloudSyncSummary = await syncLocalImagesToCloudinary(s);
+    }
+  }
+
   DB.saveSettings(s);
   startAdminSessionWatchdog();
+  loadSettingsForm();
   showMsg('settings-msg', '✓ Settings saved successfully!');
-  toast('Settings saved!');
+
+  const synced = Number(cloudSyncSummary.synced || 0);
+  const failed = Number(cloudSyncSummary.failed || 0);
+  if (synced > 0 && failed === 0) {
+    toast(`Settings saved! Synced ${synced} image${synced === 1 ? '' : 's'} to Cloudinary.`);
+  } else if (synced > 0 || failed > 0) {
+    toast(`Settings saved! Synced ${synced} image${synced === 1 ? '' : 's'}; ${failed} failed.`, failed > 0 ? 'info' : 'success');
+  } else {
+    toast('Settings saved!');
+  }
+}
+
+async function syncCloudinaryNow () {
+  const s = DB.getSettings();
+  const cfg = getCloudinaryConfigFromSettings(s);
+  if (!cfg.configured) {
+    toast('Configure Cloudinary Cloud Name and Upload Preset first.', 'error');
+    return;
+  }
+
+  const pendingFlyers = DB.getFlyers().filter(f => !f.imageUrl && isImageDataUrl(f.imageData)).length;
+  const pendingLogo = isImageDataUrl(s.churchLogo) ? 1 : 0;
+  const pendingTheme = (!s.themeOfYearImageUrl && isImageDataUrl(s.themeOfYearImageData)) ? 1 : 0;
+  if (!pendingFlyers && !pendingLogo && !pendingTheme) {
+    toast('All images are already synced to Cloudinary.', 'info');
+    return;
+  }
+
+  const btn = document.getElementById('cloudinary-sync-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+  }
+
+  toast('Syncing local images to Cloudinary…', 'info');
+
+  try {
+    const result = await syncLocalImagesToCloudinary(s);
+    DB.saveSettings(s);
+
+    const synced = Number(result.synced || 0);
+    const failed = Number(result.failed || 0);
+
+    if (failed === 0) {
+      toast(`Cloudinary sync complete: ${synced} image${synced === 1 ? '' : 's'} synced.`, 'success');
+    } else {
+      toast(`Cloudinary sync done: ${synced} synced, ${failed} failed.`, 'info');
+    }
+
+    loadFlyersTable();
+    loadSettingsForm();
+  } catch (err) {
+    console.error('Manual Cloudinary sync failed', err);
+    toast('Cloudinary sync failed. Please try again.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Sync Existing Local Images to Cloudinary';
+    }
+  }
 }
 
 function parseBackupPayload (raw) {
