@@ -42,6 +42,8 @@ body { font-family:var(--font); color:var(--gray-900); }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  filter: brightness(var(--display-brightness, 1));
+  transition: filter .45s ease;
 }
 
 /* Header */
@@ -947,6 +949,34 @@ body { font-family:var(--font); color:var(--gray-900); }
   border-left: 1px solid rgba(255,255,255,.26);
 }
 
+.network-status {
+  min-width: 96px;
+  padding: 0 10px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(255,255,255,.22);
+  border-right: 1px solid rgba(255,255,255,.22);
+  background: rgba(13, 23, 87, 0.42);
+}
+
+.network-status.online {
+  color: var(--green);
+  text-shadow: 0 0 10px rgba(46,125,50,.55);
+}
+
+.network-status.offline {
+  color: var(--red);
+  text-shadow: 0 0 10px rgba(198,40,40,.55);
+}
+
 .admin-link {
   background: rgba(255,255,255,.08);
   color: rgba(255,255,255,.35);
@@ -960,6 +990,47 @@ body { font-family:var(--font); color:var(--gray-900); }
   flex-shrink: 0;
 }
 .admin-link:hover { background: rgba(255,255,255,.18); color: var(--white); }
+
+.tv-control-btn {
+  background: rgba(255,179,0,.12);
+  color: rgba(255,179,0,.7);
+  border: 1px solid rgba(255,179,0,.3);
+  padding: 0 14px;
+  height: 100%;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all .2s;
+  flex-shrink: 0;
+  display: none;
+}
+.tv-control-btn:hover {
+  background: rgba(255,179,0,.22);
+  color: var(--gold);
+  border-color: rgba(255,179,0,.6);
+}
+
+/* TV Mode - Slightly larger fonts */
+body.tv-mode {
+  --clamp-scale: 1.1;
+}
+body.tv-mode .church-name {
+  font-size: clamp(2rem, 3.2vw, 3.5rem);
+}
+body.tv-mode .church-tagline {
+  font-size: clamp(1.1rem, 1.3vw, 1.5rem);
+}
+body.tv-mode .panel-header h2 {
+  font-size: 2rem;
+}
+body.tv-mode .prog-card,
+body.tv-mode .evt-card {
+  font-size: 1.05em;
+}
+
+body.tv-mode .network-status {
+  min-width: 104px;
+  font-size: .72rem;
+}
 
 /* ══════════════════════════════════════════════════
    ADMIN LOGIN
@@ -1359,4 +1430,5 @@ select.form-input { cursor: pointer; }
   .panel-header h2 { font-size: 1.5rem; letter-spacing: 1px; }
   .ticker-badge { padding: 0 9px; font-size: 0.84rem; letter-spacing: 0.7px; }
   .donor-note { font-size: 0.52rem; width: 116px; padding: 0 5px; }
+  .network-status { min-width: 88px; font-size: .58rem; padding: 0 7px; }
 }

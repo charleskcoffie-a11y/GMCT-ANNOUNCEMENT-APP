@@ -1,103 +1,298 @@
-GMCT ANNOUNCEMENT APP - TV SETUP GUIDE
-=====================================
-Last updated: 2026-03-17
+GMCT ANNOUNCEMENT APP - XIAOMI TV STICK 4K SETUP GUIDE
+======================================================
+Last updated: 2026-03-18
+Optimized for: Xiaomi TV Stick 4K
 
-1) REQUIRED LINKS
------------------
-Display URL:
+
+QUICK LINKS
+-----------
+Display URL (regular):
 https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/
 
-Admin URL:
+Display URL (TV / kiosk mode):
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1
+
+Display URL (TV kiosk mode with admin gear visible):
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1&showadmin=1
+
+Admin Panel:
 https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html
 
 
-2) RECOMMENDED HARDWARE (LOW COST)
-----------------------------------
-Best budget option:
-- Chromecast with Google TV (4K)
+1) RECOMMENDED HARDWARE
+-----------------------
+PRIMARY RECOMMENDATION: Xiaomi TV Stick 4K
+- Google TV interface
+- Wi-Fi 6 support
+- Bluetooth voice remote
+- HDMI-CEC support (TV control via remote)
+- Very compact stick design that hides behind the TV
+- Good fit for a dedicated church announcement display
 
-Alternative:
-- Google TV Streamer (4K)
+ALTERNATIVES:
+- Xiaomi Box S (3rd Gen)
+- Amazon Fire TV Stick 4K Max
 
-Notes:
-- Use wall power adapter for stability (do NOT power from TV USB).
-- Use stable Wi-Fi (or Ethernet if supported by device).
+WHAT YOU NEED:
+- Xiaomi TV Stick 4K
+- Included USB power cable and wall adapter
+- Optional HDMI extender if space is tight behind the TV
+- Stable WiFi connection
+- 65" TV with HDMI port
 
 
-3) FIRST-TIME TV DEVICE SETUP
+2) XIAOMI TV STICK 4K - INITIAL HARDWARE SETUP
+----------------------------------------------
+1. Unbox the Xiaomi TV Stick 4K, remote, USB power cable, and wall adapter.
+2. Plug the TV stick directly into an open HDMI port on the TV.
+3. If there is not enough space, use the included HDMI extender.
+4. Connect the USB power cable to the stick and wall adapter (do NOT power from TV USB port).
+5. Turn on the TV and switch to the HDMI input where the stick is connected.
+6. Power on the Xiaomi TV Stick 4K using the remote.
+7. Wait for Android startup (first boot takes 2-3 minutes).
+8. Follow initial setup wizard:
+   - Select your language
+   - Connect to WiFi (select your church WiFi network)
+   - Enter WiFi password
+   - Let it install system updates (may take a few minutes)
+   - You may be asked to sign in to Google account (optional, skip for now)
+9. Accept terms and complete setup when finished.
+10. You should now see the Google TV home screen.
+
+
+3) INSTALL BROWSER & KIOSK APP
+-------------------------------
+The app runs in a browser. For TV use, a TV-friendly browser or kiosk browser is best:
+
+OPTION A: Use a TV Browser (Simpler)
+1. Open Google Play Store on the TV stick.
+2. Install a TV-friendly browser such as TV Bro Browser.
+3. Open the browser and go to:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1
+4. Bookmark or favorite the URL if the browser supports it.
+
+OPTION B: Install Kiosk Browser (Recommended for Auto Launch)
+1. Open Google Play Store on the TV stick.
+2. Search for a kiosk-capable browser such as Fully Kiosk Browser.
+3. Click "Install" and wait for installation to complete.
+4. Once installed, open the kiosk app.
+5. Settings -> URL field, enter:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1
+6. Settings -> Enable "Launch on Startup".
+7. Settings -> Disable "Allow Home/Back buttons" (optional, for security).
+8. Exit and restart the TV stick to verify autostart.
+
+
+4) CONFIGURE XIAOMI TV STICK 4K FOR KIOSK MODE
+----------------------------------------------
+To make the app display reliably on TV, use these settings:
+
+1. Open Settings -> System or Device Preferences -> Screensaver / Ambient Mode.
+2. Disable screensaver or set it to Never.
+3. Open Settings -> Sleep / Energy Saver.
+4. Set sleep to Never or the longest available option.
+5. Open Settings -> HDMI-CEC.
+6. Enable HDMI-CEC and TV power control if you want the remote to help power the TV.
+7. If using a kiosk browser, enable Launch on Startup inside that app.
+8. Restart the TV stick and confirm the display page opens correctly.
+
+NOT NECESSARY FOR THE TV STICK SETUP:
+- No separate HDMI cable
+- No Ethernet or USB OTG adapter for normal use
+- No Developer Options or USB Debugging for regular church display use
+- No manual startup-app tweaks if your kiosk browser already supports Launch on Startup
+
+
+5) FULL SCREEN & TV CONTROLS
 -----------------------------
-1. Connect device to TV HDMI.
-2. Power with included adapter.
-3. Complete Google account setup.
-4. Install a browser/kiosk app from Play Store.
-5. Set startup/home URL to:
-   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/
-6. Enable app launch on boot (if kiosk app supports it).
-7. Disable sleep/screensaver/ambient mode.
-8. On Samsung TV, enable Anynet+ (HDMI-CEC).
-9. On TV, enable "Power on after power loss" if available.
+The app includes automatic TV optimization:
+
+- If running on Android TV, admin button automatically hides
+- Temporary override to show admin gear on TV: add `&showadmin=1` to kiosk URL
+- Fullscreen button (⛶) appears for manual fullscreen toggle
+- Screen stays awake automatically (no screensaver during display)
+- App starts fullscreen via ?kiosk=1 URL parameter
+
+TO ENABLE FULLSCREEN:
+1. Press fullscreen button (⛶) in bottom right of footer (TV mode only)
+2. Or press remote's fullscreen/zoom button
+3. Tap fullscreen button again to exit fullscreen
+
+TO MANAGE BRIGHTNESS:
+- Use TV remote brightness controls
+- Adjust TV picture settings if needed
 
 
-4) APP ADMIN SETUP CHECKLIST
+6) VERIFY DISPLAY IS WORKING
 ----------------------------
-1. Open Admin URL.
-2. Login (change password immediately if still default).
-3. Settings -> Cloudinary:
-   - Set Cloud Name
-   - Set Upload Preset (unsigned)
-4. Click "Save Settings".
-5. Optional: click "Sync Existing Local Images to Cloudinary".
+1. On your phone or computer, open the Admin URL:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html
+2. Login with your credentials
+3. Add a test announcement in Settings
+4. Verify it appears on the TV display within 5 seconds
+5. Test page rotation - pages should change every 10 seconds (adjustable)
+6. Turn off WiFi on the TV box for 10-15 seconds and confirm footer status changes to OFFLINE
+7. Re-enable WiFi and confirm footer status returns to ONLINE
+8. Confirm display refreshes automatically within a few seconds after reconnection
+9. Leave display running 10+ minutes and confirm no sleep/screensaver interrupts playback
+10. Confirm brightness looks appropriate in room lighting (auto adjustment runs by time; ambient sensor support varies by device)
 
 
-5) WEEKLY VIDEO ANNOUNCEMENT SETUP
-----------------------------------
-In Admin -> Settings -> Sunday Video Announcement:
-
-1. Enable Sunday schedule.
-2. Set Start Time (Sunday).
-3. Set End Time (Sunday).
-4. Optional: set Auto Remove After date/time.
-5. Upload video (recommended MP4, 720p, 1-2 minutes, <= 100MB).
-6. Confirm preview is visible.
-7. Click Save Settings.
-
-Behavior:
-- Video plays FULL SCREEN over both panels only during Sunday time window.
-- Outside the window, normal flyers/programs/social display continues.
-- If no scheduled video, only normal display is shown.
+6A) SUNDAY SERVICE STARTUP CHECKLIST (1 MINUTE)
+------------------------------------------------
+Before each service:
+1. Turn on TV and Xiaomi device.
+2. Confirm display URL is:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1
+3. Confirm footer status shows ONLINE.
+4. Confirm top-right date/time is correct.
+5. Open Admin URL on phone/laptop and verify today's key announcements/programs.
+6. If Sunday video is planned, verify schedule and preview in Settings.
+7. Watch one full page rotation (~10 seconds) to confirm transitions are running.
 
 
-6) WEEKLY OPERATIONS (STEWARD FLOW)
------------------------------------
+7) WEEKLY OPERATIONS (STEWARD FLOW)
+------------------------------------
 Every week:
-1. Open Admin URL.
-2. Upload this week's Sunday video.
-3. Update schedule times if needed.
-4. Set/remove Auto Remove After if needed.
-5. Save Settings.
-6. Verify on display screen before service.
+1. Open Admin URL on your phone or computer
+2. Update announcements/programs/social activities as needed
+3. Upload weekly Sunday video if applicable
+4. Set schedule times
+5. Click "Save Settings"
+6. Check display on TV to verify changes appear
+
+The TV display auto-refreshes every 2 minutes and updates within seconds of admin changes.
 
 
-7) CREDIT USAGE TIPS (CLOUDINARY FREE TIER)
---------------------------------------------
-- Keep only one active weekly video.
-- Keep video short and compressed.
-- Recommended: 720p, 1-2 minutes.
-- Avoid unnecessary re-uploads.
-- Monitor Cloudinary usage dashboard weekly.
+8) TROUBLESHOOTING & COMMON ISSUES
+------------------------------------
+ISSUE: TV shows black screen or "No Signal"
+SOLUTION:
+- Check the TV stick is firmly connected to the HDMI port
+- Use the included HDMI extender if the fit behind the TV is too tight
+- Try different HDMI port on TV
+- Restart Xiaomi TV Stick 4K (power off 30 seconds, power on)
+- In TV or Google TV display settings, try changing resolution if needed
+
+ISSUE: App won't start at boot
+SOLUTION:
+- Verify WiFi auto-connects (the TV stick remembers the last WiFi network)
+- If using kiosk app, verify "Launch on Startup" is enabled
+- Restart the TV stick to force boot sequence
+- Try manual launch from your installed browser to test app functionality
+
+ISSUE: App is zoomed/doesn't fit screen
+SOLUTION:
+- In your browser settings, set zoom to 100% if available
+- Press fullscreen button to reset view
+- Check TV display settings for overscan/underscan
+
+ISSUE: Ticker or text doesn't fit properly
+SOLUTION:
+- This is normal - app is responsive
+- It auto-scales for 65" TV viewing
+- No manual adjustment needed
+
+ISSUE: Page rotation stops or freezes
+SOLUTION:
+- Refresh the page in the browser
+- Check WiFi is still connected
+- Restart browser app
+- Check Firebase backend connectivity
+
+ISSUE: Real-time updates not appearing
+SOLUTION:
+- Check internet connection is stable
+- Verify Cloudinary credentials are set in Admin
+- Try refreshing the display page
+- Wait 5 seconds for auto-update (max 2 minute refresh cycle)
+
+ISSUE: Admin link visible on TV (should be hidden)
+SOLUTION:
+- Add ?kiosk=1 to the URL to force kiosk mode
+- Or ensure running on Android TV (auto-detected)
+- URL should be:
+  https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1
 
 
-8) TROUBLESHOOTING QUICK CHECK
+9) WEEKLY TV POWER SCHEDULE (OPTIONAL)
+--------------------------------------
+If you want the TV to power on/off automatically:
+
+1. Set TV timer in TV Settings -> Timer/Sleep
+2. Or use a smart power strip with automation
+
+For automated schedule, consider:
+- Smart power strip (TP-Link Kasa, etc.)
+- WiFi outlet with scheduling app
+- TV's built-in daily timer (varies by brand)
+
+
+10) CREDIT USAGE & MAINTENANCE
 ------------------------------
-If TV shows old content:
-- Refresh display page.
-- Confirm internet is connected.
-- Verify Cloudinary URL exists in Settings.
+CLOUDINARY USAGE:
+- Monitor free tier limits (25 GB/month typical)
+- Keep weekly video file size <= 100MB
+- Delete old videos from Cloudinary dashboard
+- Check usage: https://cloudinary.com/console
 
-If Sunday video does not play:
-- Check Sunday schedule is enabled.
-- Check current day/time is within Start-End range.
-- Check video URL exists and preview works in Admin.
+WEEKLY MAINTENANCE:
+- Verify display shows current content
+- Check for any error messages
+- Test new video upload if used
+- Restart app if any glitches occur
+
+STORAGE:
+- The Xiaomi TV Stick 4K has enough storage for a browser/kiosk app and this hosted display
+- No additional storage is needed for normal use
+
+
+11) DISASTER RECOVERY
+---------------------
+If app stops working:
+
+1. Check internet connection
+2. Restart Xiaomi TV Stick 4K (power off 1 min, power on)
+3. Verify WiFi auto-reconnects
+4. If still broken, force reload page in the browser
+5. Clear browser cache if your browser supports it
+6. Last resort: Factory reset the TV stick (erases everything)
+
+For immediate fallback:
+- Display admin phone on second screen with same URL
+- Manually navigate to announcement page on TV
+
+
+12) HELPFUL LINKS
+-----------------
+Display URL (regular):
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/
+
+Display URL (recommended for TV / kiosk mode):
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1
+
+Display URL (TV kiosk mode with admin gear visible):
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1&showadmin=1
+
+Admin Panel (for church staff):
+https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html
+
+GitHub Repository:
+https://github.com/charleskcoffie-a11y/GMCT-ANNOUNCEMENT-APP
+
+Cloudinary Console (for video/image management):
+https://cloudinary.com/console
+
+Firebase Console (for backend data):
+https://firebase.google.com/
+
+
+QUESTIONS?
+----------
+For app technical support or updates, check the GitHub repository
+or contact the app administrator.
+
+Happy announcing!
 - Check Auto Remove After is not in the past.
 
 If no auto-start after power outage:

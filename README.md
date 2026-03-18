@@ -40,6 +40,30 @@ A local HTML/CSS/JavaScript church announcement display application for **GMCT �
 
 > All data is stored in the browser's `localStorage`. No server or internet connection required.
 
+## TV Reliability Quick Check (Option B)
+
+Use this after opening the display URL in kiosk mode (`?kiosk=1`):
+
+1. Confirm the footer shows `ONLINE`.
+2. Turn off Wi-Fi on the TV box for 10–15 seconds and confirm the footer changes to `OFFLINE`.
+3. Re-enable Wi-Fi and confirm the footer returns to `ONLINE`.
+4. Confirm the display refreshes automatically within a few seconds after reconnection.
+5. Leave the display running for 10+ minutes and confirm no sleep/screensaver interruption.
+6. Confirm brightness is appropriate for the room (time-based auto-brightness always runs; ambient sensor support depends on device/browser).
+
+## Sunday Service Startup Checklist
+
+Use this 60-second checklist before service:
+
+1. Power on TV and Xiaomi device.
+2. Open display URL with kiosk mode: `https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1`.
+    - Need temporary gear icon on TV? Use: `https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?kiosk=1&showadmin=1`
+3. Confirm footer status shows `ONLINE`.
+4. Confirm top-right date/time is correct.
+5. On phone/laptop, open admin panel and verify today's key announcements/programs are present.
+6. If Sunday video is planned, confirm its schedule and preview in admin settings.
+7. Watch one rotation cycle (about 10 seconds) to confirm panel changes are working.
+
 ## Live Site (GitHub Pages)
 
 - 📺 Display: [https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/](https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/)

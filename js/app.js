@@ -7,6 +7,8 @@ const FIXED_HEADER_SUBTITLE = 'Upcoming Programs and Social Activities';
 const DEFAULT_SWITCH_SECONDS = 10;
 const DEFAULT_DAILY_RELOAD_TIME = '04:00';
 const DISPLAY_REFRESH_MS = 2 * 60 * 1000;
+const NETWORK_POLL_MS = 30 * 1000;
+const ONLINE_RECOVERY_DELAY_MS = 1500;
 const PROGRAMS_PER_PAGE = 4;
 const SOCIAL_PER_PAGE = 2;
 
@@ -20,6 +22,12 @@ const _rollTimers = {
 let _displayRefreshTimer = null;
 let _dailyReloadTimer = null;
 let _storageSyncTimer = null;
+let _networkStatusTimer = null;
+let _networkProbeRunning = false;
+let _pendingOnlineRefreshTimer = null;
+let _wakeLockSentinel = null;
+let _brightnessTimer = null;
+let _ambientLightSensor = null;
 let _errorRecoveryArmed = false;
 let _reliabilityHandlersBound = false;
 let _weeklyVideoCurrentUrl = '';
@@ -955,6 +963,122 @@ function scheduleDailyReload () {
   }, next.getTime() - now.getTime());
 }
 
+function setNetworkStatusIndicator (isOnline) {
+  const el = document.getElementById('network-status');
+  if (!el) return;
+
+  const online = !!isOnline;
+  el.textContent = online ? 'ONLINE' : 'OFFLINE';
+  el.classList.toggle('online', online);
+  el.classList.toggle('offline', !online);
+  el.setAttribute('aria-label', online ? 'Network status online' : 'Network status offline');
+}
+
+function setDisplayBrightness (value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return;
+  const clamped = Math.max(0.82, Math.min(1.06, n));
+  document.documentElement.style.setProperty('--display-brightness', clamped.toFixed(2));
+}
+
+function applyTimeBasedBrightness (now = new Date()) {
+  const hour = now.getHours();
+
+  if (hour >= 20 || hour < 6) {
+    setDisplayBrightness(0.9);
+  } else if (hour >= 6 && hour < 8) {
+    setDisplayBrightness(0.95);
+  } else if (hour >= 8 && hour < 18) {
+    setDisplayBrightness(1.02);
+  } else {
+    setDisplayBrightness(0.97);
+  }
+}
+
+function setupAutoBrightness () {
+  applyTimeBasedBrightness();
+  if (_brightnessTimer) clearInterval(_brightnessTimer);
+  _brightnessTimer = setInterval(() => applyTimeBasedBrightness(), 5 * 60 * 1000);
+
+  if (!isRunningOnTV()) return;
+  if (!('AmbientLightSensor' in window)) return;
+
+  try {
+    _ambientLightSensor = new window.AmbientLightSensor({ frequency: 0.2 });
+    _ambientLightSensor.addEventListener('reading', () => {
+      const lux = Number(_ambientLightSensor.illuminance);
+      if (!Number.isFinite(lux)) return;
+
+      if (lux < 20) setDisplayBrightness(0.86);
+      else if (lux < 60) setDisplayBrightness(0.92);
+      else if (lux < 150) setDisplayBrightness(0.98);
+      else setDisplayBrightness(1.04);
+    });
+
+    _ambientLightSensor.addEventListener('error', () => {
+      // Ignore and continue with time-based brightness.
+    });
+
+    _ambientLightSensor.start();
+  } catch {
+    _ambientLightSensor = null;
+  }
+}
+
+async function probeNetworkStatus () {
+  if (_networkProbeRunning) return;
+  _networkProbeRunning = true;
+
+  let timeoutId = null;
+  try {
+    if (navigator.onLine === false) {
+      setNetworkStatusIndicator(false);
+      return;
+    }
+
+    if (window.location.protocol === 'file:') {
+      setNetworkStatusIndicator(true);
+      return;
+    }
+
+    const controller = new AbortController();
+    timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(`js/data.js?gmct_ping=${Date.now()}`, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller.signal
+    });
+
+    setNetworkStatusIndicator(res.ok);
+  } catch {
+    setNetworkStatusIndicator(false);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    _networkProbeRunning = false;
+  }
+}
+
+function startNetworkMonitor () {
+  if (_networkStatusTimer) clearInterval(_networkStatusTimer);
+  probeNetworkStatus();
+  _networkStatusTimer = setInterval(probeNetworkStatus, NETWORK_POLL_MS);
+}
+
+function handleNetworkOnline () {
+  setNetworkStatusIndicator(true);
+  probeNetworkStatus();
+
+  if (_pendingOnlineRefreshTimer) clearTimeout(_pendingOnlineRefreshTimer);
+  _pendingOnlineRefreshTimer = setTimeout(() => {
+    queueDisplayRefresh();
+  }, ONLINE_RECOVERY_DELAY_MS);
+}
+
+function handleNetworkOffline () {
+  setNetworkStatusIndicator(false);
+}
+
 function shouldAutoReloadOnError () {
   return DB.getSettings().autoReloadOnError !== false;
 }
@@ -970,12 +1094,17 @@ function triggerErrorRecovery () {
 }
 
 function refreshDisplay () {
-  applySettings();
-  renderPrograms();
-  renderSecondPanel();
-  renderTicker();
-  updateWeeklySundayVideoOverlay();
-  scheduleDailyReload();
+  try {
+    applySettings();
+    renderPrograms();
+    renderSecondPanel();
+    renderTicker();
+    updateWeeklySundayVideoOverlay();
+    scheduleDailyReload();
+  } catch (err) {
+    console.error('[GMCT] refreshDisplay failed', err);
+    triggerErrorRecovery();
+  }
 }
 
 function queueDisplayRefresh () {
@@ -1107,14 +1236,116 @@ function bindReliabilityHandlers () {
     queueDisplayRefresh();
   });
 
+  window.addEventListener('online', handleNetworkOnline);
+  window.addEventListener('offline', handleNetworkOffline);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      probeNetworkStatus();
+      queueDisplayRefresh();
+    }
+  });
+
   window.addEventListener('error', triggerErrorRecovery);
   window.addEventListener('unhandledrejection', triggerErrorRecovery);
+}
+
+/* ── TV MODE OPTIMIZATION ───────────────────────── */
+function isRunningOnTV () {
+  // Detect Android TV or kiosk environment
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('android') && (ua.includes('tv') || ua.includes('smarttv') || window.screen.height > 720);
+}
+
+function isTruthyQueryFlag (value) {
+  const v = String(value || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+function shouldShowAdminLink () {
+  const params = new URLSearchParams(window.location.search);
+  if (isTruthyQueryFlag(params.get('showadmin'))) return true;
+
+  const isKiosk = params.has('kiosk') || isRunningOnTV();
+  return !isKiosk;
+}
+
+function setupTVOptimizations () {
+  // Hide admin link in kiosk mode
+  const adminLink = document.getElementById('admin-link');
+  if (adminLink) {
+    adminLink.style.display = shouldShowAdminLink() ? 'flex' : 'none';
+  }
+
+  // Setup fullscreen button
+  const fullscreenBtn = document.getElementById('fullscreen-btn');
+  if (fullscreenBtn) {
+    // Show fullscreen button only on TV
+    fullscreenBtn.style.display = isRunningOnTV() ? 'block' : 'none';
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+  }
+
+  // Add TV-specific styles
+  if (isRunningOnTV()) {
+    document.body.classList.add('tv-mode');
+  }
+
+  // Prevent screensaver/sleep
+  preventScreensaver();
+}
+
+function toggleFullscreen () {
+  const elem = document.documentElement;
+  if (!document.fullscreenElement) {
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch(err => {
+        console.log('Fullscreen request error:', err);
+      });
+    }
+  } else {
+    document.exitFullscreen().catch(err => {
+      console.log('Exit fullscreen error:', err);
+    });
+  }
+}
+
+async function requestScreenWakeLock () {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    if (_wakeLockSentinel && !_wakeLockSentinel.released) return;
+    _wakeLockSentinel = await navigator.wakeLock.request('screen');
+    _wakeLockSentinel.addEventListener('release', () => {
+      _wakeLockSentinel = null;
+    });
+  } catch {
+    _wakeLockSentinel = null;
+  }
+}
+
+function preventScreensaver () {
+  requestScreenWakeLock();
+
+  setInterval(() => {
+    if (!document.hidden) {
+      document.body.dataset.keepAwake = String(Date.now());
+    }
+  }, 30000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) requestScreenWakeLock();
+  });
 }
 
 async function init () {
   if (window.CloudSync && typeof window.CloudSync.bootstrap === 'function') {
     await window.CloudSync.bootstrap();
   }
+
+  // Setup TV mode optimizations
+  setupTVOptimizations();
+  setupAutoBrightness();
+  setNetworkStatusIndicator(navigator.onLine !== false);
+  startNetworkMonitor();
 
   refreshDisplay();
   updateClock();
