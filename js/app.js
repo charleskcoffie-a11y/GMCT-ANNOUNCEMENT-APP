@@ -572,7 +572,7 @@ function renderSocialActivities () {
   const list = getUpcomingSocialActivities();
   const flyers = getActiveFlyersForSide('social');
   renderRollingCards({
-    containerId: 'social-list',
+    containerId: 'social-or-leaders-list',
     items: list,
     pageSize: SOCIAL_PER_PAGE,
     emptyHtml: '<div class="no-content">No upcoming social activities</div>',
@@ -611,6 +611,8 @@ function shouldDisplayLeaders () {
   if (!leaders.length) return false;
   const minSocial = parseInt(settings.minSocialItemsShowLeaders, 10) || 2;
   const socialCount = getUpcomingSocialActivities().length;
+  const socialFlyerCount = getActiveFlyersForSide('social').length;
+  if (socialFlyerCount > 0) return false;
   // Replace social panel with leaders only when social activities are below threshold
   return socialCount < minSocial;
 }
