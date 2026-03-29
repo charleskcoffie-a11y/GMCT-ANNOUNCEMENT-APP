@@ -73,7 +73,7 @@ body { font-family:var(--font); color:var(--gray-900); }
 
 .church-name {
   font-family: var(--serif);
-  font-size: clamp(1.1rem, 1.7vw, 1.85rem);
+  font-size: clamp(1.2rem, 1.9vw, 2rem);
   font-weight: 700;
   color: var(--white);
   letter-spacing: 1px;
@@ -987,7 +987,7 @@ body.tv-mode {
   --clamp-scale: 1;
 }
 body.tv-mode .church-name {
-  font-size: clamp(1.05rem, 1.55vw, 1.6rem);
+  font-size: clamp(1.15rem, 1.75vw, 1.8rem);
 }
 body.tv-mode .church-tagline {
   font-size: clamp(0.68rem, 0.85vw, 0.95rem);
