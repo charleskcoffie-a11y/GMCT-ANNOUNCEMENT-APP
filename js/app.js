@@ -259,10 +259,10 @@ function showWeeklySundayVideoOverlay (settings) {
     video.addEventListener('play', () => {
       video.dataset.weeklyCycleHandled = '0';
     });
-    // Some TV browsers can miss the `ended` event; guard with near-end detection.
-    video.addEventListener('timeupdate', () => {
+    // Fallback for TV browsers that miss `ended` but do fire `pause` at natural end.
+    video.addEventListener('pause', () => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-      if (video.currentTime >= (video.duration - 0.03)) {
+      if (video.currentTime >= (video.duration - 0.15)) {
         handleVideoCycleEnd();
       }
     });
@@ -326,6 +326,13 @@ function updateWeeklySundayVideoOverlay () {
     hideThemeYearOverlay(false);
     showWeeklySundayVideoOverlay(settings);
     return true;
+  }
+
+  // During active schedule cooldown, show only normal grid (no theme overlay).
+  if (videoWindowActive && videoCooldownActive) {
+    hideWeeklySundayVideoOverlay();
+    hideThemeYearOverlay(false);
+    return false;
   }
 
   hideWeeklySundayVideoOverlay();
