@@ -863,13 +863,6 @@ body { font-family:var(--font); color:var(--gray-900); }
   align-items: center;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 -4px 20px rgba(255, 179, 0, 0.4), inset 0 0 30px rgba(0, 0, 0, 0.3);
-  animation: footerPulse 2s ease-in-out infinite;
-}
-
-@keyframes footerPulse {
-  0%, 100% { box-shadow: 0 -4px 20px rgba(255, 179, 0, 0.4), inset 0 0 30px rgba(0, 0, 0, 0.3); }
-  50% { box-shadow: 0 -8px 32px rgba(255, 179, 0, 0.7), inset 0 0 40px rgba(0, 0, 0, 0.5); }
 }
 
 .ticker-badge {
