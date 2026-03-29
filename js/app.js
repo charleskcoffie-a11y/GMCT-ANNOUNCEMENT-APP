@@ -9,7 +9,7 @@ const DEFAULT_DAILY_RELOAD_TIME = '04:00';
 const DISPLAY_REFRESH_MS = 2 * 60 * 1000;
 const NETWORK_POLL_MS = 30 * 1000;
 const ONLINE_RECOVERY_DELAY_MS = 1500;
-const WEEKLY_VIDEO_BREAK_MS = 30 * 1000;
+const WEEKLY_VIDEO_BREAK_LOOPS = 5;
 const PROGRAMS_PER_PAGE = 2;
 const SOCIAL_PER_PAGE = 2;
 
@@ -246,7 +246,8 @@ function showWeeklySundayVideoOverlay (settings) {
 
   if (!video.dataset.weeklyCycleBound) {
     video.addEventListener('ended', () => {
-      _weeklyVideoResumeAtMs = Date.now() + WEEKLY_VIDEO_BREAK_MS;
+      const loopMs = Math.max(getSwitchIntervalMs('programs'), getSwitchIntervalMs('social'));
+      _weeklyVideoResumeAtMs = Date.now() + (loopMs * WEEKLY_VIDEO_BREAK_LOOPS);
       hideWeeklySundayVideoOverlay();
     });
     video.dataset.weeklyCycleBound = '1';
