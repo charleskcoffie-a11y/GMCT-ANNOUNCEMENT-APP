@@ -518,6 +518,7 @@ function renderPrograms () {
     timerKey: 'programs',
     introPages: flyers.map(f => renderFlyerPage(f, 'programs')),
     renderCard: p => {
+      const programTitle = p.title || p.name || p.programTitle || p.programName || 'Program';
       const full = fmt12(p.startTime) || '--:--';
       const timeParts = full.split(' ');
       const tPart = timeParts[0] || '--:--';
@@ -531,7 +532,7 @@ function renderPrograms () {
 
       return `
         <div class="prog-card">
-          <div class="p-title">${esc(p.title)}</div>
+          <div class="p-title">${esc(programTitle)}</div>
           <div class="prog-time-badge">
             <span class="lbl">START TIME</span>
             <span class="t">${esc(tPart)}</span>
