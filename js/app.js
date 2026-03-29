@@ -292,19 +292,17 @@ function showWeeklySundayVideoOverlay (settings) {
 function updateWeeklySundayVideoOverlay () {
   const settings = DB.getSettings();
   const now = new Date();
+  const videoWindowActive = shouldPlayWeeklySundayVideo(settings, now);
+  const videoCooldownActive = Date.now() < _weeklyVideoResumeAtMs;
 
-  if (shouldPlayWeeklySundayVideo(settings, now)) {
-    if (Date.now() < _weeklyVideoResumeAtMs) {
-      hideWeeklySundayVideoOverlay();
-      return false;
-    }
+  if (videoWindowActive && !videoCooldownActive) {
     hideThemeYearOverlay(false);
     showWeeklySundayVideoOverlay(settings);
     return true;
   }
 
   hideWeeklySundayVideoOverlay();
-  _weeklyVideoResumeAtMs = 0;
+  if (!videoWindowActive) _weeklyVideoResumeAtMs = 0;
 
   if (shouldDisplayThemeYearNow(settings, now)) {
     showThemeYearOverlay(settings);
