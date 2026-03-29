@@ -107,8 +107,8 @@ body { font-family:var(--font); color:var(--gray-900); }
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 4px 8px 2px;
   overflow: hidden;
   position: relative;
 }
@@ -199,26 +199,32 @@ body { font-family:var(--font); color:var(--gray-900); }
 }
 .panel-body {
   flex: 1;
-  padding: 10px;
+  padding: 4px 8px 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .panel-body::-webkit-scrollbar { width: 4px; }
 .panel-body::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 2px; }
 
-/* Programs panel: 2 cards per row, equal-height rows */
+/* Programs panel: 2 cards per page, full-height rows */
 #programs-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   align-content: stretch;
 }
 
 #programs-list .prog-card {
   height: 100%;
   align-self: stretch;
+}
+
+#programs-list .no-content {
+  grid-row: 1 / -1;
+  align-self: center;
 }
 
 #social-list {
