@@ -132,20 +132,20 @@ body { font-family:var(--font); color:var(--gray-900); }
 }
 
 .weekly-video-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 30;
-  border-radius: var(--radius);
+  z-index: 9999;
+  border-radius: 0;
   overflow: hidden;
   background: #000;
-  border: 1px solid rgba(255,255,255,.16);
-  box-shadow: var(--shadow-lg);
+  border: 0;
+  box-shadow: none;
 }
 
 .weekly-video-player {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   background: #000;
 }
 
