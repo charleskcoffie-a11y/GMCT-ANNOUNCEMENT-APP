@@ -197,6 +197,11 @@ function shouldPlayWeeklySundayVideo (settings, now = new Date()) {
     }
   }
 
+  // Test mode: allow immediate playback on any day/time.
+  if (settings.weeklySundayVideoPlayNow === true) {
+    return true;
+  }
+
   if (now.getDay() !== 0) return false; // Sunday only
 
   const start = parseClockToMinutes(settings.weeklySundayVideoStartTime || '');

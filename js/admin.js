@@ -1959,6 +1959,7 @@ function loadSettingsForm () {
   }
 
   const weeklyEnabledEl = document.getElementById('set-weekly-video-enabled');
+  const weeklyPlayNowEl = document.getElementById('set-weekly-video-play-now');
   const weeklyTitleEl = document.getElementById('set-weekly-video-title');
   const weeklyStartEl = document.getElementById('set-weekly-video-start');
   const weeklyEndEl = document.getElementById('set-weekly-video-end');
@@ -1972,6 +1973,7 @@ function loadSettingsForm () {
   const weeklyRemoveAfter = toDateTimeLocalValueFromIso(s.weeklySundayVideoRemoveAfter || '');
 
   if (weeklyEnabledEl) weeklyEnabledEl.checked = s.weeklySundayVideoEnabled === true;
+  if (weeklyPlayNowEl) weeklyPlayNowEl.checked = s.weeklySundayVideoPlayNow === true;
   if (weeklyTitleEl) weeklyTitleEl.value = s.weeklySundayVideoTitle || '';
   if (weeklyStartEl) weeklyStartEl.value = weeklyStart;
   if (weeklyEndEl) weeklyEndEl.value = weeklyEnd;
@@ -1985,7 +1987,9 @@ function loadSettingsForm () {
   if (weeklyStatusEl) {
     const scheduleText = `Sunday ${weeklyStart} - ${weeklyEnd}`;
     const removeText = weeklyRemoveAfter ? ` Auto remove: ${weeklyRemoveAfter.replace('T', ' ')}` : '';
-    if (weeklyVideoUrl && s.weeklySundayVideoEnabled) {
+    if (weeklyVideoUrl && s.weeklySundayVideoEnabled && s.weeklySundayVideoPlayNow) {
+      weeklyStatusEl.innerHTML = `<span style="color:#ef6c00;">Test mode ON: video plays immediately on display. Disable test mode to return to Sunday-only (${scheduleText}).${removeText}</span>`;
+    } else if (weeklyVideoUrl && s.weeklySundayVideoEnabled) {
       weeklyStatusEl.innerHTML = `<span style="color:#2e7d32;">&#10003; Scheduled video active (${scheduleText}).${removeText}</span>`;
     } else if (weeklyVideoUrl) {
       weeklyStatusEl.innerHTML = `<span style="color:#6a1b9a;">Video uploaded but schedule is disabled (${scheduleText}).${removeText}</span>`;
@@ -2112,6 +2116,7 @@ async function saveSettings () {
 
   // Sunday weekly video schedule
   const weeklyEnabled = document.getElementById('set-weekly-video-enabled').checked;
+  const weeklyPlayNow = document.getElementById('set-weekly-video-play-now').checked;
   const weeklyTitle = (document.getElementById('set-weekly-video-title').value || '').trim();
   const weeklyStartRaw = (document.getElementById('set-weekly-video-start').value || '').trim();
   const weeklyEndRaw = (document.getElementById('set-weekly-video-end').value || '').trim();
@@ -2130,6 +2135,7 @@ async function saveSettings () {
   }
 
   s.weeklySundayVideoEnabled = weeklyEnabled;
+  s.weeklySundayVideoPlayNow = weeklyPlayNow;
   s.weeklySundayVideoTitle = weeklyTitle;
   s.weeklySundayVideoStartTime = weeklyStartRaw;
   s.weeklySundayVideoEndTime = weeklyEndRaw;
