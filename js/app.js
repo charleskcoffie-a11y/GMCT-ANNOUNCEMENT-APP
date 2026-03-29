@@ -244,11 +244,28 @@ function showWeeklySundayVideoOverlay (settings) {
   const titleEl = document.getElementById('weekly-video-title');
   if (!overlay || !video) return;
 
+  // Enforce single-play behavior even if browser cached loop state.
+  video.loop = false;
+
+  const handleVideoCycleEnd = () => {
+    if (video.dataset.weeklyCycleHandled === '1') return;
+    video.dataset.weeklyCycleHandled = '1';
+    const loopMs = Math.max(getSwitchIntervalMs('programs'), getSwitchIntervalMs('social'));
+    _weeklyVideoResumeAtMs = Date.now() + (loopMs * WEEKLY_VIDEO_BREAK_LOOPS);
+    hideWeeklySundayVideoOverlay();
+  };
+
   if (!video.dataset.weeklyCycleBound) {
-    video.addEventListener('ended', () => {
-      const loopMs = Math.max(getSwitchIntervalMs('programs'), getSwitchIntervalMs('social'));
-      _weeklyVideoResumeAtMs = Date.now() + (loopMs * WEEKLY_VIDEO_BREAK_LOOPS);
-      hideWeeklySundayVideoOverlay();
+    video.addEventListener('ended', handleVideoCycleEnd);
+    video.addEventListener('play', () => {
+      video.dataset.weeklyCycleHandled = '0';
+    });
+    // Some TV browsers can miss the `ended` event; guard with near-end detection.
+    video.addEventListener('timeupdate', () => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+      if (video.currentTime >= (video.duration - 0.2)) {
+        handleVideoCycleEnd();
+      }
     });
     video.dataset.weeklyCycleBound = '1';
   }
@@ -263,6 +280,7 @@ function showWeeklySundayVideoOverlay (settings) {
     _weeklyVideoCurrentUrl = videoUrl;
     video.src = videoUrl;
     video.load();
+    video.dataset.weeklyCycleHandled = '0';
   }
 
   const titleText = String(settings.weeklySundayVideoTitle || '').trim();
