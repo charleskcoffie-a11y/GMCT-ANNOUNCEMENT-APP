@@ -49,21 +49,21 @@ body { font-family:var(--font); color:var(--gray-900); }
 /* Header */
 .display-header {
   background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
-  padding: 22px 40px;
+  padding: 8px 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 4px solid var(--gold);
+  border-bottom: 3px solid var(--gold);
   flex-shrink: 0;
 }
 .hd-left .cross-icon {
-  font-size: 4rem;
+  font-size: 2.6rem;
   color: var(--gold);
-  filter: drop-shadow(0 0 14px rgba(255,179,0,.7));
+  filter: drop-shadow(0 0 10px rgba(255,179,0,.7));
 }
 .hd-left .church-logo {
-  max-height: 80px;
-  max-width: 160px;
+  max-height: 52px;
+  max-width: 130px;
   object-fit: contain;
   filter: drop-shadow(0 0 10px rgba(255,255,255,.35));
 }
@@ -72,7 +72,7 @@ body { font-family:var(--font); color:var(--gray-900); }
 
 .church-name {
   font-family: var(--serif);
-  font-size: clamp(1.8rem, 3vw, 3.2rem);
+  font-size: clamp(1.3rem, 2.1vw, 2.2rem);
   font-weight: 700;
   color: var(--white);
   letter-spacing: 1px;
@@ -80,24 +80,24 @@ body { font-family:var(--font); color:var(--gray-900); }
   white-space: nowrap;
 }
 .church-tagline {
-  font-size: clamp(1rem, 1.2vw, 1.35rem);
+  font-size: clamp(0.72rem, 0.9vw, 1rem);
   color: var(--gold-light);
   font-weight: 500;
   letter-spacing: 1.5px;
-  margin-top: 6px;
+  margin-top: 3px;
 }
-.hd-right { text-align: right; min-width: 220px; }
+.hd-right { text-align: right; min-width: 180px; }
 .live-time {
-  font-size: clamp(1.6rem, 2.3vw, 2.6rem);
+  font-size: clamp(1.1rem, 1.7vw, 1.9rem);
   font-weight: 700;
   color: var(--white);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .live-date {
-  font-size: clamp(.9rem, 1.1vw, 1.2rem);
+  font-size: clamp(0.7rem, 0.85vw, 0.95rem);
   color: var(--gold-light);
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 /* Main grid */
@@ -854,9 +854,9 @@ body { font-family:var(--font); color:var(--gray-900); }
 /* Ticker – ANNOUNCEMENT SECTION */
 .display-footer {
   background: linear-gradient(90deg, var(--red) 0%, #d32f2f 50%, var(--red) 100%);
-  border-top: 6px solid var(--gold);
-  border-bottom: 4px solid var(--gold);
-  height: 90px;
+  border-top: 4px solid var(--gold);
+  border-bottom: 3px solid var(--gold);
+  height: 58px;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -901,7 +901,7 @@ body { font-family:var(--font); color:var(--gray-900); }
   display: inline-block;
   white-space: nowrap;
   color: #ffd8bf;
-  font-size: 1.6rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: 1px;
   animation: ticker linear infinite;
