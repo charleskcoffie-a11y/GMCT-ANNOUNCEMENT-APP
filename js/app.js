@@ -9,7 +9,7 @@ const DEFAULT_DAILY_RELOAD_TIME = '04:00';
 const DISPLAY_REFRESH_MS = 2 * 60 * 1000;
 const NETWORK_POLL_MS = 30 * 1000;
 const ONLINE_RECOVERY_DELAY_MS = 1500;
-const PROGRAMS_PER_PAGE = 4;
+const PROGRAMS_PER_PAGE = 2;
 const SOCIAL_PER_PAGE = 2;
 
 const _rollTimers = {
