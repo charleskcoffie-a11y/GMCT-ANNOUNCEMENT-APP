@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS = {
   weeklySundayVideoEndTime: '09:15',
   weeklySundayVideoTitle: '',
   weeklySundayVideoPlayNow: false,
+  weeklySundayVideoPauseSeconds: 60,
   weeklySundayVideoRemoveAfter: '',
   themeOfYearEnabled: false,
   themeOfYearShowSeconds: 12,

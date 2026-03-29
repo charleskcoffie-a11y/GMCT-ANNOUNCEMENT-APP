@@ -9,7 +9,7 @@ const DEFAULT_DAILY_RELOAD_TIME = '04:00';
 const DISPLAY_REFRESH_MS = 2 * 60 * 1000;
 const NETWORK_POLL_MS = 30 * 1000;
 const ONLINE_RECOVERY_DELAY_MS = 1500;
-const WEEKLY_VIDEO_BREAK_LOOPS = 5;
+const DEFAULT_WEEKLY_VIDEO_PAUSE_SECONDS = 60;
 const PROGRAMS_PER_PAGE = 2;
 const SOCIAL_PER_PAGE = 2;
 
@@ -250,8 +250,7 @@ function showWeeklySundayVideoOverlay (settings) {
   const handleVideoCycleEnd = () => {
     if (video.dataset.weeklyCycleHandled === '1') return;
     video.dataset.weeklyCycleHandled = '1';
-    const loopMs = Math.max(getSwitchIntervalMs('programs'), getSwitchIntervalMs('social'));
-    _weeklyVideoResumeAtMs = Date.now() + (loopMs * WEEKLY_VIDEO_BREAK_LOOPS);
+    _weeklyVideoResumeAtMs = Date.now() + getWeeklyVideoPauseMs(settings);
     hideWeeklySundayVideoOverlay();
   };
 
@@ -263,7 +262,7 @@ function showWeeklySundayVideoOverlay (settings) {
     // Some TV browsers can miss the `ended` event; guard with near-end detection.
     video.addEventListener('timeupdate', () => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-      if (video.currentTime >= (video.duration - 0.2)) {
+      if (video.currentTime >= (video.duration - 0.03)) {
         handleVideoCycleEnd();
       }
     });
@@ -305,6 +304,16 @@ function showWeeklySundayVideoOverlay (settings) {
       });
     }
   }
+}
+
+function getWeeklyVideoPauseMs (settings) {
+  const seconds = clampInt(
+    settings && settings.weeklySundayVideoPauseSeconds,
+    5,
+    1800,
+    DEFAULT_WEEKLY_VIDEO_PAUSE_SECONDS
+  );
+  return seconds * 1000;
 }
 
 function updateWeeklySundayVideoOverlay () {

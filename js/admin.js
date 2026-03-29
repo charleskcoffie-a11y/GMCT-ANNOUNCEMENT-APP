@@ -1963,6 +1963,7 @@ function loadSettingsForm () {
   const weeklyTitleEl = document.getElementById('set-weekly-video-title');
   const weeklyStartEl = document.getElementById('set-weekly-video-start');
   const weeklyEndEl = document.getElementById('set-weekly-video-end');
+  const weeklyPauseEl = document.getElementById('set-weekly-video-pause-seconds');
   const weeklyRemoveAfterEl = document.getElementById('set-weekly-video-remove-after');
   const weeklyStatusEl = document.getElementById('weekly-video-status');
   const weeklyFileInput = document.getElementById('set-weekly-video-file');
@@ -1970,6 +1971,7 @@ function loadSettingsForm () {
   const weeklyVideoUrl = String(s.weeklySundayVideoUrl || '').trim();
   const weeklyStart = sanitizeClockTime(s.weeklySundayVideoStartTime, '09:00');
   const weeklyEnd = sanitizeClockTime(s.weeklySundayVideoEndTime, '09:15');
+  const weeklyPauseSeconds = clampInt(s.weeklySundayVideoPauseSeconds, 5, 1800, 60);
   const weeklyRemoveAfter = toDateTimeLocalValueFromIso(s.weeklySundayVideoRemoveAfter || '');
 
   if (weeklyEnabledEl) weeklyEnabledEl.checked = s.weeklySundayVideoEnabled === true;
@@ -1977,6 +1979,7 @@ function loadSettingsForm () {
   if (weeklyTitleEl) weeklyTitleEl.value = s.weeklySundayVideoTitle || '';
   if (weeklyStartEl) weeklyStartEl.value = weeklyStart;
   if (weeklyEndEl) weeklyEndEl.value = weeklyEnd;
+  if (weeklyPauseEl) weeklyPauseEl.value = String(weeklyPauseSeconds);
   if (weeklyRemoveAfterEl) weeklyRemoveAfterEl.value = weeklyRemoveAfter;
 
   _pendingWeeklyVideoFile = null;
@@ -1985,7 +1988,7 @@ function loadSettingsForm () {
   if (weeklyFileInput) weeklyFileInput.value = '';
 
   if (weeklyStatusEl) {
-    const scheduleText = `Sunday ${weeklyStart} - ${weeklyEnd}`;
+    const scheduleText = `Sunday ${weeklyStart} - ${weeklyEnd}; pause ${weeklyPauseSeconds}s`;
     const removeText = weeklyRemoveAfter ? ` Auto remove: ${weeklyRemoveAfter.replace('T', ' ')}` : '';
     if (weeklyVideoUrl && s.weeklySundayVideoEnabled && s.weeklySundayVideoPlayNow) {
       weeklyStatusEl.innerHTML = `<span style="color:#ef6c00;">Test mode ON: video plays immediately on display. Disable test mode to return to Sunday-only (${scheduleText}).${removeText}</span>`;
@@ -2120,6 +2123,7 @@ async function saveSettings () {
   const weeklyTitle = (document.getElementById('set-weekly-video-title').value || '').trim();
   const weeklyStartRaw = (document.getElementById('set-weekly-video-start').value || '').trim();
   const weeklyEndRaw = (document.getElementById('set-weekly-video-end').value || '').trim();
+  const weeklyPauseRaw = (document.getElementById('set-weekly-video-pause-seconds').value || '').trim();
   const weeklyRemoveAfterRaw = (document.getElementById('set-weekly-video-remove-after').value || '').trim();
 
   if (!isValidClockTime(weeklyStartRaw) || !isValidClockTime(weeklyEndRaw)) {
@@ -2134,11 +2138,14 @@ async function saveSettings () {
     return;
   }
 
+  const weeklyPauseSeconds = clampInt(weeklyPauseRaw, 5, 1800, 60);
+
   s.weeklySundayVideoEnabled = weeklyEnabled;
   s.weeklySundayVideoPlayNow = weeklyPlayNow;
   s.weeklySundayVideoTitle = weeklyTitle;
   s.weeklySundayVideoStartTime = weeklyStartRaw;
   s.weeklySundayVideoEndTime = weeklyEndRaw;
+  s.weeklySundayVideoPauseSeconds = weeklyPauseSeconds;
 
   if (weeklyRemoveAfterRaw) {
     const removeAfterIso = toIsoFromDateTimeLocalValue(weeklyRemoveAfterRaw);
