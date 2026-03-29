@@ -334,9 +334,7 @@ body { font-family:var(--font); color:var(--gray-900); }
   padding: 20px 22px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'title title'
-    'info time';
+  grid-template-rows: auto 1fr;
   align-content: start;
   column-gap: 14px;
   row-gap: 8px;
@@ -344,21 +342,23 @@ body { font-family:var(--font); color:var(--gray-900); }
 }
 .prog-card:hover { border-color: var(--gold); transform: translateX(4px); }
 .prog-card .p-title {
-  grid-area: title;
-  color: var(--white);
+  grid-column: 1;
+  grid-row: 1;
+  color: #ffffff !important;
   font-size: 1.45rem;
   font-weight: 700;
   line-height: 1.18;
   min-width: 0;
   display: block;
-  max-height: calc(1.18em * 2);
+  max-height: 2.5em;
   white-space: normal;
   overflow-wrap: anywhere;
   overflow: hidden;
   text-shadow: 0 1px 2px rgba(0,0,0,.35);
 }
 .prog-time-badge {
-  grid-area: time;
+  grid-column: 2;
+  grid-row: 1 / span 2;
   background: var(--gold);
   color: var(--primary-dark);
   border-radius: 9px;
@@ -379,7 +379,7 @@ body { font-family:var(--font); color:var(--gray-900); }
 }
 .prog-time-badge .t { display: block; font-size: 1.55rem; font-weight: 800; line-height: 1.1; }
 .prog-time-badge .ap { font-size: .9rem; font-weight: 700; text-transform: uppercase; }
-.prog-info { grid-area: info; min-width: 0; display: flex; flex-direction: column; }
+.prog-info { grid-column: 1; grid-row: 2; min-width: 0; display: flex; flex-direction: column; }
 .prog-info .p-date { color: #d6dcff; font-size: 1.05rem; margin-top: 5px; }
 .prog-info .p-venue { color: var(--gold-light); font-size: 1.05rem; margin-top: 6px; }
 .prog-info .p-venue::before { content: '📍 '; }
