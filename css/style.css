@@ -67,17 +67,18 @@ body { font-family:var(--font); color:var(--gray-900); }
   object-fit: contain;
   filter: drop-shadow(0 0 10px rgba(255,255,255,.35));
 }
-.hd-left, .hd-right { flex-shrink: 0; flex-basis: 220px; }
-.hd-center { text-align: center; flex: 1; padding: 0 20px; min-width: 0; }
+.hd-left, .hd-right { flex-shrink: 0; flex-basis: 160px; }
+.hd-center { text-align: center; flex: 1; padding: 0 12px; min-width: 0; overflow: hidden; }
 
 .church-name {
   font-family: var(--serif);
-  font-size: clamp(1.3rem, 2.1vw, 2.2rem);
+  font-size: clamp(1.1rem, 1.7vw, 1.85rem);
   font-weight: 700;
   color: var(--white);
   letter-spacing: 1px;
   text-shadow: 0 3px 12px rgba(0,0,0,.5);
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 .church-tagline {
   font-size: clamp(0.72rem, 0.9vw, 1rem);
@@ -182,17 +183,18 @@ body { font-family:var(--font); color:var(--gray-900); }
   flex-shrink: 0;
 }
 .panel-header > span {
-  font-size: 1.65rem;
+  font-size: 1.2rem;
   line-height: 1;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
 }
 .panel-header h2 {
   color: var(--white);
-  font-size: 1.85rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  letter-spacing: 1.6px;
+  letter-spacing: 1.4px;
   line-height: 1.1;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .panel-body {
   flex: 1;
