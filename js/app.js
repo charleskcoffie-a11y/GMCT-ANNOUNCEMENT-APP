@@ -9,6 +9,7 @@ const DEFAULT_DAILY_RELOAD_TIME = '04:00';
 const DISPLAY_REFRESH_MS = 2 * 60 * 1000;
 const NETWORK_POLL_MS = 30 * 1000;
 const ONLINE_RECOVERY_DELAY_MS = 1500;
+const WEEKLY_VIDEO_BREAK_MS = 30 * 1000;
 const PROGRAMS_PER_PAGE = 2;
 const SOCIAL_PER_PAGE = 2;
 
@@ -32,6 +33,7 @@ let _errorRecoveryArmed = false;
 let _reliabilityHandlersBound = false;
 let _weeklyVideoCurrentUrl = '';
 let _weeklyVideoVisible = false;
+let _weeklyVideoResumeAtMs = 0;
 let _themeYearCurrentSrc = '';
 let _themeYearVisible = false;
 let _themeYearRotationKey = '';
@@ -242,6 +244,14 @@ function showWeeklySundayVideoOverlay (settings) {
   const titleEl = document.getElementById('weekly-video-title');
   if (!overlay || !video) return;
 
+  if (!video.dataset.weeklyCycleBound) {
+    video.addEventListener('ended', () => {
+      _weeklyVideoResumeAtMs = Date.now() + WEEKLY_VIDEO_BREAK_MS;
+      hideWeeklySundayVideoOverlay();
+    });
+    video.dataset.weeklyCycleBound = '1';
+  }
+
   const videoUrl = String(settings.weeklySundayVideoUrl || '').trim();
   if (!videoUrl) {
     hideWeeklySundayVideoOverlay();
@@ -283,12 +293,17 @@ function updateWeeklySundayVideoOverlay () {
   const now = new Date();
 
   if (shouldPlayWeeklySundayVideo(settings, now)) {
+    if (Date.now() < _weeklyVideoResumeAtMs) {
+      hideWeeklySundayVideoOverlay();
+      return false;
+    }
     hideThemeYearOverlay(false);
     showWeeklySundayVideoOverlay(settings);
     return true;
   }
 
   hideWeeklySundayVideoOverlay();
+  _weeklyVideoResumeAtMs = 0;
 
   if (shouldDisplayThemeYearNow(settings, now)) {
     showThemeYearOverlay(settings);
