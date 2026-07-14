@@ -23,6 +23,10 @@
       <h2 class="login-title">Admin Login</h2>
       <p class="login-sub">GMCT Display Management</p>
       <div class="form-group">
+        <label for="login-society">Society</label>
+        <select id="login-society" class="form-input" onchange="onLoginSocietyChanged()"></select>
+      </div>
+      <div class="form-group">
         <label for="login-password">Password</label>
         <input type="password" id="login-password" class="form-input" placeholder="Enter admin password" />
       </div>
@@ -190,6 +194,57 @@
             Display header is fixed to:
             <strong>GMCT-Ghana Methodist Church of Toronto</strong>
           </p>
+          <div class="form-grid" style="margin-bottom:10px;">
+            <div class="form-group">
+              <label>Current Society</label>
+              <input type="text" id="set-current-society" class="form-input" readonly />
+              <p style="margin:6px 0 0;color:#666;font-size:.78rem;line-height:1.45;">This account edits data for the selected society only.</p>
+            </div>
+            <div class="form-group" id="super-admin-unlock-wrap">
+              <label>Super Admin Partition Control</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input type="password" id="set-super-admin-pass" class="form-input" placeholder="Super admin password" style="flex:1;min-width:220px;" />
+                <button type="button" class="btn btn-outline btn-sm" onclick="unlockSuperAdminControls()">Unlock</button>
+              </div>
+              <p style="margin:6px 0 0;color:#666;font-size:.78rem;line-height:1.45;">Only super admin can switch society partitions.</p>
+            </div>
+            <div id="super-admin-controls" class="form-grid two-col hidden">
+              <div class="form-group">
+                <label>Society Partition ID</label>
+                <input type="text" id="set-society-id" class="form-input" placeholder="e.g. ebenezer-hamilton" autocomplete="off" />
+                <p style="margin:6px 0 0;color:#666;font-size:.78rem;line-height:1.45;">Use lowercase letters, numbers, and hyphens.</p>
+              </div>
+              <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="switchSocietyContext()">Switch Society</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="copySocietyLinks()">Copy Society Links</button>
+              </div>
+            </div>
+            <div id="super-admin-society-tools" class="form-grid two-col hidden" style="margin-top:8px;">
+              <div class="form-group">
+                <label>Manage Society</label>
+                <select id="super-society-select" class="form-input"></select>
+                <p id="super-society-info" style="margin:6px 0 0;color:#666;font-size:.78rem;line-height:1.45;">Choose a society to manage password or open admin directly.</p>
+              </div>
+              <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="loadSelectedSocietyInfo()">Load Society Info</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="openSelectedSocietyAdmin()">Open Society Admin</button>
+              </div>
+              <div class="form-group">
+                <label>Set New Admin Password</label>
+                <input type="password" id="super-new-society-pass" class="form-input" placeholder="Minimum 6 characters" />
+              </div>
+              <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="setSelectedSocietyPassword()">Set Password</button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="resetSelectedSocietyPassword()">Reset to admin123</button>
+              </div>
+              <div class="form-group full-width" style="margin-top:2px;">
+                <label>Super Admin Audit Log (latest 20)</label>
+                <div id="super-admin-audit-log" style="border:1px solid #d9deef;border-radius:10px;background:#fafbff;max-height:220px;overflow:auto;padding:8px 10px;font-size:.8rem;color:#344;line-height:1.45;">
+                  Unlock super admin controls to load audit log.
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="form-grid two-col">
             <div class="form-group">
               <label>📢 Announcement Scroll Speed &nbsp;<span id="ticker-speed-val" style="color:#1a237e;font-weight:700;">40</span><span style="color:#888;font-weight:400;font-size:.82rem;"> / 120</span></label>

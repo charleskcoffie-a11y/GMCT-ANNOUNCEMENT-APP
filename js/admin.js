@@ -101,6 +101,7 @@ function startAdminSessionWatchdog () {
 
 function clearAdminSession () {
   sessionStorage.removeItem('gmct_admin');
+  sessionStorage.removeItem('gmct_admin_society');
   sessionStorage.removeItem('gmct_admin_last_activity');
   if (_adminSessionWatchdog) {
     clearInterval(_adminSessionWatchdog);
@@ -111,6 +112,10 @@ function clearAdminSession () {
 /* ── Auth ────────────────────────────────────────── */
 function checkSession () {
   if (sessionStorage.getItem('gmct_admin') !== 'true') return false;
+  if (sessionStorage.getItem('gmct_admin_society') !== getCurrentSocietyId()) {
+    clearAdminSession();
+    return false;
+  }
 
   const lastSeen = parseInt(sessionStorage.getItem('gmct_admin_last_activity') || '0', 10);
   if (!lastSeen) {
@@ -145,6 +150,7 @@ async function doLogin () {
   if (pw === DB.getSettings().adminPassword) {
     clearFailedLoginState();
     sessionStorage.setItem('gmct_admin', 'true');
+    sessionStorage.setItem('gmct_admin_society', getCurrentSocietyId());
     sessionStorage.setItem('gmct_admin_last_activity', String(Date.now()));
     errorEl.classList.add('hidden');
     document.getElementById('login-screen').classList.add('hidden');
@@ -171,6 +177,48 @@ async function doLogin () {
 function doLogout () {
   clearAdminSession();
   location.reload();
+}
+
+function getConfiguredSocieties () {
+  const out = [];
+  const seen = new Set();
+  const configured = Array.isArray(window.GMCT_SOCIETY_OPTIONS) ? window.GMCT_SOCIETY_OPTIONS : [];
+
+  configured.forEach(item => {
+    const id = sanitizeSocietyId(item && item.id);
+    if (!id || seen.has(id)) return;
+    const label = String((item && item.label) || id).trim() || id;
+    out.push({ id, label });
+    seen.add(id);
+  });
+
+  const current = getCurrentSocietyId();
+  if (!seen.has(current)) out.unshift({ id: current, label: current });
+  if (!out.length) out.push({ id: 'gmct-main', label: 'GMCT Main' });
+
+  return out;
+}
+
+function populateLoginSocietyPicker () {
+  const select = document.getElementById('login-society');
+  if (!select) return;
+
+  const societies = getConfiguredSocieties();
+  const current = getCurrentSocietyId();
+  select.innerHTML = societies
+    .map(s => `<option value="${esc(s.id)}">${esc(s.label)}</option>`)
+    .join('');
+  select.value = current;
+}
+
+function onLoginSocietyChanged () {
+  const select = document.getElementById('login-society');
+  if (!select) return;
+
+  const society = sanitizeSocietyId(select.value || '');
+  if (!society || society === getCurrentSocietyId()) return;
+  const target = buildSocietyUrl('admin.html', society, false);
+  window.location.href = target;
 }
 
 /* Allow Enter key on login */
@@ -1677,6 +1725,356 @@ function sanitizeDailyReloadTime (value) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
+function sanitizeSocietyId (value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function getCurrentSocietyId () {
+  return sanitizeSocietyId(window.GMCT_FIREBASE_ROOM || window.GMCT_ACTIVE_SOCIETY || 'gmct-main') || 'gmct-main';
+}
+
+function isSuperAdminConfigured () {
+  return String(window.GMCT_SUPER_ADMIN_PASSWORD || '').length >= 6;
+}
+
+function isSuperAdminUnlocked () {
+  const wrap = document.getElementById('super-admin-controls');
+  return !!(wrap && !wrap.classList.contains('hidden'));
+}
+
+function getSelectedSuperSocietyId () {
+  const select = document.getElementById('super-society-select');
+  return sanitizeSocietyId(select && select.value ? select.value : '');
+}
+
+function setSuperSocietyInfo (text, color = '#666') {
+  const info = document.getElementById('super-society-info');
+  if (!info) return;
+  info.textContent = text;
+  info.style.color = color;
+}
+
+function renderSuperAdminAuditLog (rows) {
+  const el = document.getElementById('super-admin-audit-log');
+  if (!el) return;
+
+  if (!Array.isArray(rows) || !rows.length) {
+    el.innerHTML = '<div style="color:#667;">No audit entries yet.</div>';
+    return;
+  }
+
+  el.innerHTML = rows.map(r => {
+    const whenMs = Number(r.whenMs || 0);
+    const when = whenMs > 0 ? new Date(whenMs).toLocaleString() : 'Unknown time';
+    const action = String(r.action || 'unknown-action');
+    const society = String(r.society || 'unknown-society');
+    const actor = String(r.actor || 'super-admin');
+    return `<div style="padding:6px 0;border-bottom:1px solid #e8ebf7;">
+      <strong>${esc(action)}</strong> for <strong>${esc(society)}</strong><br/>
+      <span style="color:#607080;">${esc(when)} by ${esc(actor)}</span>
+    </div>`;
+  }).join('');
+}
+
+function populateSuperSocietySelect () {
+  const select = document.getElementById('super-society-select');
+  if (!select) return;
+
+  const societies = getConfiguredSocieties();
+  const current = getCurrentSocietyId();
+  select.innerHTML = societies
+    .map(s => `<option value="${esc(s.id)}">${esc(s.label)} (${esc(s.id)})</option>`)
+    .join('');
+  select.value = current;
+}
+
+async function ensureSuperAdminFirestore () {
+  if (!window.firebase || !firebase.initializeApp || !firebase.firestore) return null;
+  const cfg = window.GMCT_FIREBASE_CONFIG || {};
+  if (!cfg.apiKey || !cfg.authDomain || !cfg.projectId || !cfg.appId) return null;
+
+  const appName = 'gmct-announcement-super-admin';
+  const app = firebase.apps.find(a => a.name === appName) || firebase.initializeApp(cfg, appName);
+
+  if (window.GMCT_FIREBASE_USE_ANON_AUTH !== false && firebase.auth) {
+    try {
+      await firebase.auth(app).signInAnonymously();
+    } catch {
+      // Continue when rules allow without auth.
+    }
+  }
+
+  return firebase.firestore(app);
+}
+
+async function writeSuperAdminAudit (action, society) {
+  const db = await ensureSuperAdminFirestore();
+  if (!db) return false;
+
+  try {
+    await db.collection('gmctAdminAudit').add({
+      action: String(action || 'unknown-action'),
+      society: String(society || ''),
+      actor: 'super-admin',
+      whenMs: Date.now(),
+      source: 'admin-settings'
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function loadSuperAdminAuditLog () {
+  const db = await ensureSuperAdminFirestore();
+  if (!db) {
+    renderSuperAdminAuditLog([]);
+    return;
+  }
+
+  try {
+    const snap = await db.collection('gmctAdminAudit').orderBy('whenMs', 'desc').limit(20).get();
+    const rows = [];
+    snap.forEach(doc => rows.push(doc.data() || {}));
+    renderSuperAdminAuditLog(rows);
+  } catch {
+    const el = document.getElementById('super-admin-audit-log');
+    if (el) el.innerHTML = '<div style="color:#b71c1c;">Could not load audit log. Check Firebase rules/index.</div>';
+  }
+}
+
+async function loadSelectedSocietyInfo () {
+  if (!isSuperAdminUnlocked()) {
+    toast('Unlock super admin controls first', 'error');
+    return;
+  }
+
+  const society = getSelectedSuperSocietyId();
+  if (!society) {
+    toast('Select a valid society first', 'error');
+    return;
+  }
+
+  const db = await ensureSuperAdminFirestore();
+  if (!db) {
+    toast('Could not connect to Firebase for super admin actions', 'error');
+    return;
+  }
+
+  try {
+    const snap = await db.collection('gmctRooms').doc(society).get();
+    if (!snap.exists) {
+      setSuperSocietyInfo(`No cloud record yet for ${society}. It will be created on first save.`, '#6a1b9a');
+      return;
+    }
+    const data = snap.data() || {};
+    const updatedAt = Number(data.updatedAtMs || 0);
+    const updatedLabel = updatedAt > 0 ? new Date(updatedAt).toLocaleString() : 'unknown';
+    const hasPassword = !!(data.settings && data.settings.adminPassword);
+    setSuperSocietyInfo(
+      `Loaded ${society}. Last sync: ${updatedLabel}. Password is ${hasPassword ? 'set' : 'missing'} in cloud.`,
+      '#2e7d32'
+    );
+  } catch {
+    toast('Unable to load society info. Check Firebase rules/connection.', 'error');
+  }
+}
+
+async function setSocietyAdminPasswordInCloud (society, password) {
+  const db = await ensureSuperAdminFirestore();
+  if (!db) throw new Error('Firebase unavailable');
+
+  await db.collection('gmctRooms').doc(society).set({
+    settings: {
+      adminPassword: password
+    },
+    updatedAtMs: Date.now()
+  }, { merge: true });
+}
+
+async function setSelectedSocietyPassword () {
+  if (!isSuperAdminUnlocked()) {
+    toast('Unlock super admin controls first', 'error');
+    return;
+  }
+
+  const society = getSelectedSuperSocietyId();
+  if (!society) {
+    toast('Select a valid society first', 'error');
+    return;
+  }
+
+  const input = document.getElementById('super-new-society-pass');
+  const password = String(input && input.value ? input.value : '');
+  if (password.length < 6) {
+    toast('Password must be at least 6 characters', 'error');
+    return;
+  }
+
+  try {
+    await setSocietyAdminPasswordInCloud(society, password);
+    await writeSuperAdminAudit('set-password', society);
+    await loadSuperAdminAuditLog();
+    if (input) input.value = '';
+    setSuperSocietyInfo(`Password updated for ${society}.`, '#2e7d32');
+    toast('Society password updated', 'success');
+  } catch {
+    toast('Failed to update society password', 'error');
+  }
+}
+
+async function resetSelectedSocietyPassword () {
+  if (!isSuperAdminUnlocked()) {
+    toast('Unlock super admin controls first', 'error');
+    return;
+  }
+
+  const society = getSelectedSuperSocietyId();
+  if (!society) {
+    toast('Select a valid society first', 'error');
+    return;
+  }
+
+  if (!confirm(`Reset admin password for ${society} to admin123?`)) return;
+
+  try {
+    await setSocietyAdminPasswordInCloud(society, 'admin123');
+    await writeSuperAdminAudit('reset-password-default', society);
+    await loadSuperAdminAuditLog();
+    const input = document.getElementById('super-new-society-pass');
+    if (input) input.value = '';
+    setSuperSocietyInfo(`Password reset to admin123 for ${society}.`, '#ef6c00');
+    toast('Society password reset to admin123', 'success');
+  } catch {
+    toast('Failed to reset society password', 'error');
+  }
+}
+
+function openSelectedSocietyAdmin () {
+  if (!isSuperAdminUnlocked()) {
+    toast('Unlock super admin controls first', 'error');
+    return;
+  }
+
+  const society = getSelectedSuperSocietyId();
+  if (!society) {
+    toast('Select a valid society first', 'error');
+    return;
+  }
+
+  const target = buildSocietyUrl('admin.html', society, false);
+  window.location.href = target;
+}
+
+function setSuperAdminControlsVisible (visible) {
+  const wrap = document.getElementById('super-admin-controls');
+  if (!wrap) return;
+  wrap.classList.toggle('hidden', !visible);
+
+  const tools = document.getElementById('super-admin-society-tools');
+  if (tools) tools.classList.toggle('hidden', !visible);
+
+  if (visible) {
+    populateSuperSocietySelect();
+    setSuperSocietyInfo('Choose a society to manage password or open admin directly.');
+    loadSuperAdminAuditLog();
+  } else {
+    renderSuperAdminAuditLog([]);
+  }
+}
+
+function unlockSuperAdminControls () {
+  if (!isSuperAdminConfigured()) {
+    toast('Super admin password is not configured in firebase-config.js', 'info');
+    return;
+  }
+
+  const input = document.getElementById('set-super-admin-pass');
+  if (!input) return;
+
+  const entered = String(input.value || '');
+  if (entered !== String(window.GMCT_SUPER_ADMIN_PASSWORD || '')) {
+    toast('Invalid super admin password', 'error');
+    return;
+  }
+
+  setSuperAdminControlsVisible(true);
+  input.value = '';
+  toast('Super admin controls unlocked', 'success');
+}
+
+function buildSocietyUrl (pathName, societyId, keepKioskFlag) {
+  const target = new URL(pathName, window.location.href);
+  target.searchParams.set('society', societyId);
+  if (keepKioskFlag && /index\.html$/i.test(pathName)) {
+    const currentParams = new URLSearchParams(window.location.search || '');
+    if (currentParams.get('kiosk') === '1') target.searchParams.set('kiosk', '1');
+    if (currentParams.get('showadmin') === '1') target.searchParams.set('showadmin', '1');
+  }
+  return target.toString();
+}
+
+function switchSocietyContext () {
+  if (!document.getElementById('super-admin-controls') || document.getElementById('super-admin-controls').classList.contains('hidden')) {
+    toast('Unlock super admin controls first', 'error');
+    return;
+  }
+
+  const inputEl = document.getElementById('set-society-id');
+  if (!inputEl) return;
+
+  const society = sanitizeSocietyId(inputEl.value || '');
+  if (!society) {
+    toast('Enter a valid society ID (letters, numbers, hyphens)', 'error');
+    return;
+  }
+
+  inputEl.value = society;
+  const target = buildSocietyUrl('admin.html', society, false);
+  window.location.href = target;
+}
+
+async function copySocietyLinks () {
+  if (!document.getElementById('super-admin-controls') || document.getElementById('super-admin-controls').classList.contains('hidden')) {
+    toast('Unlock super admin controls first', 'error');
+    return;
+  }
+
+  const inputEl = document.getElementById('set-society-id');
+  if (!inputEl) return;
+
+  const society = sanitizeSocietyId(inputEl.value || '');
+  if (!society) {
+    toast('Enter a valid society ID first', 'error');
+    return;
+  }
+
+  inputEl.value = society;
+  const displayUrl = buildSocietyUrl('index.html', society, false);
+  const kioskUrl = `${displayUrl}&kiosk=1`;
+  const kioskAdminUrl = `${displayUrl}&kiosk=1&showadmin=1`;
+  const adminUrl = buildSocietyUrl('admin.html', society, false);
+  const text = [
+    `Display URL (${society}): ${displayUrl}`,
+    `Display URL TV kiosk (${society}): ${kioskUrl}`,
+    `Display URL TV kiosk + admin gear (${society}): ${kioskAdminUrl}`,
+    `Admin URL (${society}): ${adminUrl}`
+  ].join('\n');
+
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Society links copied to clipboard', 'success');
+  } catch {
+    toast('Could not copy links automatically. Please copy manually from address bar.', 'info');
+  }
+}
+
 function sanitizeClockTime (value, fallback = '09:00') {
   return isValidClockTime(value) ? value : fallback;
 }
@@ -1899,6 +2297,13 @@ function setTransitionPicker (pickerId, hiddenId, value) {
 
 function loadSettingsForm () {
   const s = DB.getSettings();
+  const currentSocietyEl = document.getElementById('set-current-society');
+  if (currentSocietyEl) currentSocietyEl.value = getCurrentSocietyId();
+  const societyEl = document.getElementById('set-society-id');
+  if (societyEl) societyEl.value = getCurrentSocietyId();
+  const superAdminPassEl = document.getElementById('set-super-admin-pass');
+  if (superAdminPassEl) superAdminPassEl.value = '';
+  setSuperAdminControlsVisible(false);
   const speed = clampInt(s.tickerSpeed, 10, 120, 40);
   const legacySwitch = clampInt(s.cardSwitchSeconds, 5, 60, 10);
   const programSwitch = clampInt(s.programSwitchSeconds, 5, 60, legacySwitch);
@@ -2425,6 +2830,7 @@ function toast (msg, type = 'success') {
 
 /* ── On page load ────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
+  populateLoginSocietyPicker();
   if (window.CloudSync && typeof window.CloudSync.bootstrap === 'function') {
     await window.CloudSync.bootstrap();
   }

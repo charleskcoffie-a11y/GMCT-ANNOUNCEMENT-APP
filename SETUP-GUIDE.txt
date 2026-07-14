@@ -19,6 +19,51 @@ Admin Panel:
 https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html
 
 
+0) MULTI-SOCIETY URL PARTITION (RECOMMENDED)
+--------------------------------------------
+To keep each society's data separate, use a unique URL parameter:
+- `?society=your-society-id`
+
+Each society gets isolated data for programs, social activities, flyers, announcements,
+leaders, and settings.
+
+CURRENT EXAMPLES:
+
+Ebenezer, Hamilton
+- Display URL:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?society=ebenezer-hamilton
+- TV kiosk URL:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?society=ebenezer-hamilton&kiosk=1
+- Admin URL:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html?society=ebenezer-hamilton
+
+St. Paul Society, Baltimore
+- Display URL:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?society=st-paul-baltimore
+- TV kiosk URL:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/?society=st-paul-baltimore&kiosk=1
+- Admin URL:
+   https://charleskcoffie-a11y.github.io/GMCT-ANNOUNCEMENT-APP/admin.html?society=st-paul-baltimore
+
+ADMIN SHORTCUT:
+- In Admin -> Settings, set Society Partition ID and click "Switch Society".
+- Use "Copy Society Links" to generate and copy all URLs for the selected society.
+
+PASSWORD MODEL:
+- Each society has its own Admin password (saved inside that society partition settings).
+- Society stewards should only open their own Admin URL with `?society=...`.
+- Super Admin (you) can unlock partition controls in Settings using Super Admin password.
+- Keep Super Admin password private and do not share with society stewards.
+
+SUPER ADMIN CAPABILITIES:
+- Unlock in Admin -> Settings using Super Admin password.
+- Switch to any society partition.
+- Load society cloud info.
+- Set a new admin password for a selected society.
+- Reset selected society password to `admin123`.
+- View recent Super Admin audit log entries for password actions.
+
+
 1) RECOMMENDED HARDWARE
 -----------------------
 PRIMARY RECOMMENDATION: Xiaomi TV Stick 4K
